@@ -593,7 +593,7 @@ struct HamburgerMenuView: View {
             .padding(.bottom, 24)
             
             // Menu Items - Minimal Design
-            VStack(spacing: 1) {
+            VStack(spacing: 12) {
                 MinimalMenuButton(
                     icon: "message.fill",
                     title: "Sohbet",
