@@ -9,7 +9,7 @@ struct FullScreenPhotoViewer: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var photoService: PhotoService
     
-    let photos: [Photo]
+    @Binding var photos: [Photo]
     @State var selectedIndex: Int
     
     @State private var showControls = true

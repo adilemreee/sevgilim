@@ -15,6 +15,8 @@ struct HomeView: View {
     @EnvironmentObject var noteService: NoteService
     @EnvironmentObject var planService: PlanService
     @EnvironmentObject var movieService: MovieService
+    @EnvironmentObject var placeService: PlaceService
+    @EnvironmentObject var songService: SongService
     
     @State private var currentDate = Date()
     @State private var animateHearts = false
@@ -22,6 +24,8 @@ struct HomeView: View {
     @State private var navigateToPlans = false
     @State private var navigateToMovies = false
     @State private var navigateToChat = false
+    @State private var navigateToPlaces = false
+    @State private var navigateToSongs = false
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     
     var body: some View {
@@ -73,8 +77,6 @@ struct HomeView: View {
                                 )
                             }
                             
-                            // Love Quote
-                            LoveQuoteCard()
                         }
                     }
                     .padding(.horizontal, 20)
@@ -104,6 +106,12 @@ struct HomeView: View {
             .navigationDestination(isPresented: $navigateToChat) {
                 ChatView()
             }
+            .navigationDestination(isPresented: $navigateToPlaces) {
+                PlacesView()
+            }
+            .navigationDestination(isPresented: $navigateToSongs) {
+                SongsView()
+            }
             .sheet(isPresented: $showingMenu) {
                 HamburgerMenuView(
                     onPlansSelected: {
@@ -123,11 +131,26 @@ struct HomeView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             navigateToChat = true
                         }
+                    },
+                    onPlacesSelected: {
+                        showingMenu = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            navigateToPlaces = true
+                        }
+                    },
+                    onSongsSelected: {
+                        showingMenu = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            navigateToSongs = true
+                        }
                     }
                 )
+                .environmentObject(themeManager)
                 .environmentObject(planService)
                 .environmentObject(movieService)
-                .presentationDetents([.height(350)])
+                .environmentObject(placeService)
+                .environmentObject(songService)
+                .presentationDetents([.height(450)])
                 .presentationDragIndicator(.visible)
             }
             .onReceive(timer) { _ in
@@ -459,45 +482,6 @@ struct UpcomingPlansCard: View {
     }
 }
 
-// MARK: - Love Quote (Optimized)
-struct LoveQuoteCard: View {
-    @State private var currentQuoteIndex = 0
-    
-    let quotes = [
-        "Aşk, iki kişinin birbirini bulması değil, birbirini aramasıdır.",
-        "Sen benim hayatımın en güzel hatası, en tatlı cezasısın.",
-        "Birlikte olduğumuz her an, hayatımın en güzel anıdır.",
-        "Sen olmadan geçen her gün, kayıp bir gündür.",
-        "Aşk, kalbinin attığı her saniyede seni düşünmektir."
-    ]
-    
-    var body: some View {
-        VStack(spacing: 15) {
-            Image(systemName: "quote.bubble.fill")
-                .font(.title2)
-                .foregroundColor(.white.opacity(0.8))
-            
-            Text(quotes[currentQuoteIndex])
-                .font(.subheadline)
-                .foregroundColor(.white)
-                .multilineTextAlignment(.center)
-                .italic()
-                .padding(.horizontal, 10)
-                .id(currentQuoteIndex) // Only animate text changes
-        }
-        .padding(20)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
-        .task {
-            // Use task instead of timer for better performance
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 15_000_000_000) // 15 seconds
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    currentQuoteIndex = (currentQuoteIndex + 1) % quotes.count
-                }
-            }
-        }
-    }
-}
 
 // MARK: - Profile Button with Caching
 struct ProfileButton: View {
@@ -537,117 +521,154 @@ struct ProfileButton: View {
 // MARK: - Hamburger Menu View
 struct HamburgerMenuView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var planService: PlanService
     @EnvironmentObject var movieService: MovieService
+    @EnvironmentObject var placeService: PlaceService
+    @EnvironmentObject var songService: SongService
     
     let onPlansSelected: () -> Void
     let onMoviesSelected: () -> Void
     let onChatSelected: () -> Void
+    let onPlacesSelected: () -> Void
+    let onSongsSelected: () -> Void
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 0) {
             // Drag Handle
-            RoundedRectangle(cornerRadius: 3)
-                .fill(Color.gray.opacity(0.4))
-                .frame(width: 40, height: 5)
-                .padding(.top, 10)
+            Capsule()
+                .fill(Color.gray.opacity(0.3))
+                .frame(width: 36, height: 4)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
             
             // Header
-            HStack {
-                Image(systemName: "line.3.horizontal.circle.fill")
-                    .font(.title2)
+            VStack(spacing: 4) {
+                Text("Menü")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.blue, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                            colors: [themeManager.currentTheme.primaryColor, themeManager.currentTheme.accentColor],
+                            startPoint: .leading,
+                            endPoint: .trailing
                         )
                     )
                 
-                Text("Menü")
-                    .font(.title3.bold())
-                
-                Spacer()
+                Text("AŞKIMSIN")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
             
-            // Menu Items
-            VStack(spacing: 0) {
-                Button(action: onChatSelected) {
-                    MenuRow(
-                        icon: "message.fill",
-                        title: "Sohbet",
-                        subtitle: "Mesajlaş",
-                        color: .blue
-                    )
-                }
+            // Menu Items - Minimal Design
+            VStack(spacing: 1) {
+                MinimalMenuButton(
+                    icon: "message.fill",
+                    title: "Sohbet",
+                    theme: themeManager.currentTheme,
+                    action: onChatSelected
+                )
                 
-                Divider().padding(.leading, 70)
+                MinimalMenuButton(
+                    icon: "calendar",
+                    title: "Planlar",
+                    count: planService.plans.count,
+                    theme: themeManager.currentTheme,
+                    action: onPlansSelected
+                )
                 
-                Button(action: onPlansSelected) {
-                    MenuRow(
-                        icon: "calendar",
-                        title: "Planlar",
-                        subtitle: "\(planService.plans.count) plan",
-                        color: .indigo
-                    )
-                }
+                MinimalMenuButton(
+                    icon: "film.fill",
+                    title: "Filmler",
+                    count: movieService.movies.count,
+                    theme: themeManager.currentTheme,
+                    action: onMoviesSelected
+                )
                 
-                Divider().padding(.leading, 70)
+                MinimalMenuButton(
+                    icon: "map.fill",
+                    title: "Yerler",
+                    count: placeService.places.count,
+                    theme: themeManager.currentTheme,
+                    action: onPlacesSelected
+                )
                 
-                Button(action: onMoviesSelected) {
-                    MenuRow(
-                        icon: "film.fill",
-                        title: "Filmler",
-                        subtitle: "\(movieService.movies.count) film",
-                        color: .red
-                    )
-                }
+                MinimalMenuButton(
+                    icon: "music.note.list",
+                    title: "Şarkılar",
+                    count: songService.songs.count,
+                    theme: themeManager.currentTheme,
+                    action: onSongsSelected
+                )
             }
-            .background(Color(.systemGray6))
-            .cornerRadius(15)
             .padding(.horizontal, 20)
             
             Spacer()
         }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.hidden)
     }
 }
 
-struct MenuRow: View {
+struct MinimalMenuButton: View {
     let icon: String
     let title: String
-    let subtitle: String
-    let color: Color
+    var count: Int?
+    let theme: AppTheme
+    let action: () -> Void
+    
+    @State private var isPressed = false
     
     var body: some View {
-        HStack(spacing: 15) {
-            ZStack {
-                Circle()
-                    .fill(color.opacity(0.15))
-                    .frame(width: 50, height: 50)
-                
+        Button(action: action) {
+            HStack(spacing: 16) {
+                // Icon
                 Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(color)
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(theme.primaryColor)
+                    .frame(width: 24)
+                
+                // Title
                 Text(title)
-                    .font(.headline)
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundColor(.primary)
                 
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Spacer()
+                
+                // Count Badge (if available)
+                if let count = count, count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(theme.primaryColor.opacity(0.8))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(theme.primaryColor.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+                
+                // Chevron
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.secondary.opacity(0.5))
             }
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isPressed ? Color(.systemGray6) : Color(.systemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color(.systemGray5).opacity(0.5), lineWidth: 0.5)
+            )
         }
-        .padding()
+        .buttonStyle(PlainButtonStyle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
     }
 }
 

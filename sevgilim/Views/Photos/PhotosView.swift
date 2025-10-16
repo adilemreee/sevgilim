@@ -149,7 +149,7 @@ struct PhotosView: View {
         }
         .fullScreenCover(item: $selectedPhotoForViewer) { selection in
             if !photoService.photos.isEmpty && selection.index < photoService.photos.count {
-                FullScreenPhotoViewer(photos: photoService.photos, selectedIndex: selection.index)
+                FullScreenPhotoViewer(photos: $photoService.photos, selectedIndex: selection.index)
                     .environmentObject(photoService)
             }
         }
