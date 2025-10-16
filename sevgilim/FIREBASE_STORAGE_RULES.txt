@@ -1,0 +1,83 @@
+# Firebase Storage Security Rules for Sevgilim App
+
+## Sürprizler için gerekli Storage Rules
+
+Firebase Console'da Storage > Rules bölümüne gidin ve aşağıdaki kuralları ekleyin:
+
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Surprises klasörü - authentication gerekli
+    match /surprises/{relationshipId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Photos klasörü (mevcut)
+    match /photos/{relationshipId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Memories klasörü (mevcut)
+    match /memories/{relationshipId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Profile images klasörü (mevcut)
+    match /profileImages/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Tüm authenticated kullanıcılar için genel erişim
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+## Adımlar:
+
+1. Firebase Console'a gidin (https://console.firebase.google.com)
+2. Projenizi seçin
+3. Sol menüden "Storage" seçin
+4. Üst menüden "Rules" tab'ına tıklayın
+5. Yukarıdaki rules'ları yapıştırın
+6. "Publish" butonuna basın
+
+## Test için basit rule (geçici):
+
+Eğer yukarıdaki kurallar çalışmazsa, test için bu basit kuralı kullanabilirsiniz:
+
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+Bu kural tüm authenticated kullanıcılara okuma ve yazma izni verir.
+
+## Güvenlik Notları:
+
+- Production'da daha spesifik kurallar kullanmalısınız
+- Dosya boyutu limitleri eklenebilir
+- Dosya tipi kontrolleri eklenebilir
+- Rate limiting düşünülebilir
+
+## Önemli:
+
+Bu kuralları uyguladıktan sonra:
+1. Uygulamayı yeniden başlatın
+2. Logout/Login yapın
+3. Yeni sürpriz eklemeyi deneyin
+4. Console'da hata loglarını kontrol edin

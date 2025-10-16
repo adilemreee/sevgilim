@@ -7,6 +7,17 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var themeManager: ThemeManager
+    @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject var relationshipService: RelationshipService
+    @EnvironmentObject var surpriseService: SurpriseService
+    @EnvironmentObject var memoryService: MemoryService
+    @EnvironmentObject var photoService: PhotoService
+    @EnvironmentObject var noteService: NoteService
+    @EnvironmentObject var planService: PlanService
+    @EnvironmentObject var movieService: MovieService
+    @EnvironmentObject var placeService: PlaceService
+    @EnvironmentObject var songService: SongService
+    
     @State private var selectedTab = 0
     
     var body: some View {
@@ -47,6 +58,25 @@ struct MainTabView: View {
                 }
         }
         .accentColor(themeManager.currentTheme.primaryColor)
+        .onAppear {
+            // Tüm servislerin listener'larını başlat
+            if let currentUser = authService.currentUser,
+               let userId = currentUser.id,
+               let relationshipId = currentUser.relationshipId {
+                
+                // Sürpriz servisini başlat
+                surpriseService.listenToSurprises(relationshipId: relationshipId, userId: userId)
+                
+                // Diğer servisleri de başlat
+                memoryService.listenToMemories(relationshipId: relationshipId)
+                photoService.listenToPhotos(relationshipId: relationshipId)
+                noteService.listenToNotes(relationshipId: relationshipId)
+                planService.listenToPlans(relationshipId: relationshipId)
+                movieService.listenToMovies(relationshipId: relationshipId)
+                placeService.listenToPlaces(relationshipId: relationshipId)
+                songService.listenToSongs(relationshipId: relationshipId)
+            }
+        }
     }
 }
 

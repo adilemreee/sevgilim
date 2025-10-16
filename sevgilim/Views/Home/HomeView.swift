@@ -17,6 +17,7 @@ struct HomeView: View {
     @EnvironmentObject var movieService: MovieService
     @EnvironmentObject var placeService: PlaceService
     @EnvironmentObject var songService: SongService
+    @EnvironmentObject var surpriseService: SurpriseService
     
     @State private var currentDate = Date()
     @State private var animateHearts = false
@@ -26,6 +27,7 @@ struct HomeView: View {
     @State private var navigateToChat = false
     @State private var navigateToPlaces = false
     @State private var navigateToSongs = false
+    @State private var navigateToSurprises = false
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     
     var body: some View {
@@ -77,6 +79,23 @@ struct HomeView: View {
                                 )
                             }
                             
+                            // Partner Surprise Card
+                            if let currentUser = authService.currentUser,
+                               let userId = currentUser.id,
+                               let surprise = surpriseService.nextUpcomingSurpriseForUser(userId: userId) {
+                                PartnerSurpriseHomeCard(
+                                    surprise: surprise,
+                                    onTap: {
+                                        navigateToSurprises = true
+                                    },
+                                    onOpen: {
+                                        Task {
+                                            try? await surpriseService.markAsOpened(surprise)
+                                        }
+                                    }
+                                )
+                            }
+                            
                         }
                     }
                     .padding(.horizontal, 20)
@@ -112,6 +131,9 @@ struct HomeView: View {
             .navigationDestination(isPresented: $navigateToSongs) {
                 SongsView()
             }
+            .navigationDestination(isPresented: $navigateToSurprises) {
+                SurprisesView()
+            }
             .sheet(isPresented: $showingMenu) {
                 HamburgerMenuView(
                     onPlansSelected: {
@@ -143,6 +165,12 @@ struct HomeView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             navigateToSongs = true
                         }
+                    },
+                    onSurprisesSelected: {
+                        showingMenu = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            navigateToSurprises = true
+                        }
                     }
                 )
                 .environmentObject(themeManager)
@@ -150,7 +178,8 @@ struct HomeView: View {
                 .environmentObject(movieService)
                 .environmentObject(placeService)
                 .environmentObject(songService)
-                .presentationDetents([.height(450)])
+                .environmentObject(surpriseService)
+                .presentationDetents([.height(500)])
                 .presentationDragIndicator(.visible)
             }
             .onReceive(timer) { _ in
@@ -526,12 +555,14 @@ struct HamburgerMenuView: View {
     @EnvironmentObject var movieService: MovieService
     @EnvironmentObject var placeService: PlaceService
     @EnvironmentObject var songService: SongService
+    @EnvironmentObject var surpriseService: SurpriseService
     
     let onPlansSelected: () -> Void
     let onMoviesSelected: () -> Void
     let onChatSelected: () -> Void
     let onPlacesSelected: () -> Void
     let onSongsSelected: () -> Void
+    let onSurprisesSelected: () -> Void
     
     var body: some View {
         VStack(spacing: 0) {
@@ -568,6 +599,14 @@ struct HamburgerMenuView: View {
                     title: "Sohbet",
                     theme: themeManager.currentTheme,
                     action: onChatSelected
+                )
+                
+                MinimalMenuButton(
+                    icon: "gift.fill",
+                    title: "Sürprizler",
+                    count: surpriseService.surprises.count,
+                    theme: themeManager.currentTheme,
+                    action: onSurprisesSelected
                 )
                 
                 MinimalMenuButton(
@@ -669,6 +708,181 @@ struct MinimalMenuButton: View {
                 .onChanged { _ in isPressed = true }
                 .onEnded { _ in isPressed = false }
         )
+    }
+}
+
+
+// MARK: - Partner Surprise Home Card
+struct PartnerSurpriseHomeCard: View {
+    let surprise: Surprise
+    let onTap: () -> Void
+    let onOpen: () -> Void
+    
+    @State private var timeRemaining: TimeInterval = 0
+    @State private var timer: Timer?
+    @State private var showConfetti = false
+    @State private var pulseAnimation = false
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "gift.fill")
+                            .font(.body)
+                            .foregroundColor(.pink)
+                        Text(surprise.isLocked ? "Gizli Sürpriz" : (surprise.shouldReveal ? "Sürpriz Hazır!" : surprise.title))
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+                
+                Divider()
+                    .background(Color.white.opacity(0.2))
+                    .padding(.horizontal, 20)
+                
+                // Content
+                if surprise.isLocked {
+                    // Kilitli - Kompakt Geri Sayım
+                    VStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "lock.fill")
+                                .font(.caption)
+                            Text("İçeriği görmek için zamanı bekle!")
+                                .font(.caption)
+                        }
+                        .foregroundColor(.white.opacity(0.7))
+                        .padding(.top, 12)
+                        
+                        Text("Açılışa Kalan Süre")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.6))
+                            .padding(.top, 4)
+                        
+                        // Kompakt geri sayım
+                        HStack(spacing: 12) {
+                            TimeUnitCompactSmall(value: days, unit: "Gün")
+                            Text(":")
+                                .foregroundColor(.white.opacity(0.5))
+                                .font(.title3)
+                            TimeUnitCompactSmall(value: hours, unit: "Saat")
+                            Text(":")
+                                .foregroundColor(.white.opacity(0.5))
+                                .font(.title3)
+                            TimeUnitCompactSmall(value: minutes, unit: "Dk")
+                            Text(":")
+                                .foregroundColor(.white.opacity(0.5))
+                                .font(.title3)
+                            TimeUnitCompactSmall(value: seconds, unit: "Sn")
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    .padding(.bottom, 16)
+                } else if surprise.shouldReveal && !surprise.isOpened {
+                    // Açılmaya Hazır
+                    VStack(spacing: 8) {
+                        Text("🎉 Sürprizi açmak için dokun!")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.9))
+                            .padding(.vertical, 12)
+                    }
+                    .padding(.bottom, 16)
+                } else {
+                    // Açılmış
+                    VStack(spacing: 6) {
+                        Text("Açılmış Sürpriz")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(.vertical, 12)
+                    }
+                    .padding(.bottom, 16)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .confetti(isActive: showConfetti)
+        .onAppear {
+            setupTimer()
+            startPulseAnimation()
+        }
+        .onDisappear {
+            timer?.invalidate()
+        }
+    }
+    
+    // MARK: - Time Unit Compact Small
+    
+    private struct TimeUnitCompactSmall: View {
+        let value: Int
+        let unit: String
+        
+        var body: some View {
+            VStack(spacing: 2) {
+                Text("\(value)")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .monospacedDigit()
+                
+                Text(unit)
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .frame(width: 40)
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var days: Int {
+        return Int(timeRemaining) / 86400
+    }
+    
+    private var hours: Int {
+        return (Int(timeRemaining) % 86400) / 3600
+    }
+    
+    private var minutes: Int {
+        return (Int(timeRemaining) % 3600) / 60
+    }
+    
+    private var seconds: Int {
+        return Int(timeRemaining) % 60
+    }
+    
+    // MARK: - Functions
+    
+    private func setupTimer() {
+        timeRemaining = surprise.timeRemaining
+        
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            if timeRemaining > 0 {
+                timeRemaining -= 1
+            } else {
+                timer?.invalidate()
+            }
+        }
+    }
+    
+    private func startPulseAnimation() {
+        withAnimation(
+            .easeInOut(duration: 1.5)
+            .repeatForever(autoreverses: true)
+        ) {
+            pulseAnimation = true
+        }
     }
 }
 
