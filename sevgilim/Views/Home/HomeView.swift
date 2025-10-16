@@ -554,7 +554,7 @@ struct HamburgerMenuView: View {
                         )
                     )
                 
-                Text("AŞKIMSIN")
+                Text("AŞKIMSIN 🧡")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.secondary)
             }
