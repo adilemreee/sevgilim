@@ -13,6 +13,7 @@ struct ProfileView: View {
     @State private var showingEditProfile = false
     @State private var showingEditRelationship = false
     @State private var showingThemeSelector = false
+    @State private var showingSettings = false
     @State private var showingSignOutAlert = false
     
     var body: some View {
@@ -44,6 +45,11 @@ struct ProfileView: View {
                     ThemeCard(
                         currentTheme: themeManager.currentTheme,
                         onTap: { showingThemeSelector = true }
+                    )
+                    
+                    // Settings Card - Tıklanabilir
+                    SettingsButtonCard(
+                        onTap: { showingSettings = true }
                     )
                     
                     // Sign Out Card
@@ -89,6 +95,9 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showingThemeSelector) {
             ThemeSelectorView()
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
         }
         .alert("Çıkış Yap", isPresented: $showingSignOutAlert) {
             Button("İptal", role: .cancel) {}
@@ -206,7 +215,7 @@ struct RelationshipInfoCard: View {
             VStack(spacing: 15) {
                 InfoRow(
                     icon: "person.2.fill",
-                    title: "Partner",
+                    title: "Sevgilimm",
                     value: relationship.partnerName(for: currentUserId)
                 )
                 
@@ -313,6 +322,239 @@ struct ThemeCard: View {
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
             .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
         }
+    }
+}
+
+// MARK: - Settings Button Card
+struct SettingsButtonCard: View {
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack {
+                Image(systemName: "gearshape.fill")
+                    .font(.title3)
+                    .foregroundColor(.white)
+                
+                Text("Ayarlar")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .padding(25)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+        }
+    }
+}
+
+// MARK: - Settings View
+struct SettingsView: View {
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    @State private var showingDeleteAccountAlert = false
+    @State private var showingClearCacheAlert = false
+    @State private var cacheCleared = false
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background
+                LinearGradient(
+                    colors: [
+                        themeManager.currentTheme.primaryColor.opacity(0.3),
+                        themeManager.currentTheme.secondaryColor.opacity(0.2)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Header
+                        HStack(spacing: 12) {
+                            Image(systemName: "gearshape.2.fill")
+                                .font(.system(size: 24))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.blue, .cyan],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Ayarlar")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                
+                                Text("Uygulama ayarları")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
+                        
+                        // Settings Items
+                        VStack(spacing: 16) {
+                            // Clear Cache
+                            Button(action: { showingClearCacheAlert = true }) {
+                                HStack(spacing: 15) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.blue.opacity(0.2))
+                                            .frame(width: 50, height: 50)
+                                        
+                                        Image(systemName: "arrow.clockwise.circle.fill")
+                                            .font(.title3)
+                                            .foregroundColor(.blue)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Önbelleği Temizle")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.primary)
+                                        
+                                        Text(cacheCleared ? "Önbellek temizlendi ✓" : "Önbelleğe alınmış resimleri sil")
+                                            .font(.caption)
+                                            .foregroundColor(cacheCleared ? .green : .secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary.opacity(0.5))
+                                }
+                                .padding(16)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                            }
+                            
+                            // App Version
+                            HStack(spacing: 15) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.green.opacity(0.2))
+                                        .frame(width: 50, height: 50)
+                                    
+                                    Image(systemName: "info.circle.fill")
+                                        .font(.title3)
+                                        .foregroundColor(.green)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Uygulama Sürümü")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.primary)
+                                    
+                                    Text("v1.0.0")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                            }
+                            .padding(16)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                            
+                            // Divider
+                            Rectangle()
+                                .fill(Color.secondary.opacity(0.3))
+                                .frame(height: 1)
+                                .padding(.vertical, 8)
+                            
+                            // Delete Account
+                            Button(action: { showingDeleteAccountAlert = true }) {
+                                HStack(spacing: 15) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.red.opacity(0.2))
+                                            .frame(width: 50, height: 50)
+                                        
+                                        Image(systemName: "trash.circle.fill")
+                                            .font(.title3)
+                                            .foregroundColor(.red)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Hesabı Sil")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.red)
+                                        
+                                        Text("Tüm verileriniz kalıcı olarak silinir")
+                                            .font(.caption)
+                                            .foregroundColor(.red.opacity(0.7))
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.red.opacity(0.5))
+                                }
+                                .padding(16)
+                                .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.bottom, 30)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("Geri")
+                        }
+                        .foregroundColor(themeManager.currentTheme.primaryColor)
+                    }
+                }
+            }
+            .alert("Önbelleği Temizle", isPresented: $showingClearCacheAlert) {
+                Button("İptal", role: .cancel) {}
+                Button("Temizle") {
+                    Task {
+                        await ImageCacheService.shared.clearCache()
+                        await MainActor.run {
+                            cacheCleared = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                cacheCleared = false
+                            }
+                        }
+                    }
+                }
+            } message: {
+                Text("Önbelleğe alınmış tüm resimler silinecek. Verileriniz korunacak.")
+            }
+            .alert("Hesabı Sil", isPresented: $showingDeleteAccountAlert) {
+                Button("İptal", role: .cancel) {}
+                Button("Sil", role: .destructive) {
+                    // TODO: Implement full account deletion
+                    authService.signOut()
+                    dismiss()
+                }
+            } message: {
+                Text("⚠️ Hesabınız ve tüm verileriniz kalıcı olarak silinecek. Bu işlem geri alınamaz!")
+            }
+        }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }
 
