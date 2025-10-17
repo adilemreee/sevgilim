@@ -23,6 +23,8 @@ struct StoryViewer: View {
     @State private var dragOffset: CGFloat = 0
     @State private var showingDeleteAlert = false
     @State private var showingAddStory = false
+    @State private var showingMessageInput = false
+    @State private var messageText = ""
     
     private let storyDuration: TimeInterval = 5 // 5 saniye
     
@@ -214,18 +216,22 @@ struct StoryViewer: View {
                         // Alt Bar - Instagram tarzı
                         if story.createdBy != authService.currentUser?.id {
                             HStack(spacing: 12) {
-                                // Mesaj Input (Devre dışı)
-                                HStack {
-                                    Text("Mesaj gönder")
-                                        .foregroundColor(.white.opacity(0.4))
-                                        .font(.system(size: 15))
-                                    Spacer()
+                                // Mesaj Input (Aktif)
+                                Button(action: {
+                                    showingMessageInput = true
+                                    pauseTimer()
+                                }) {
+                                    HStack {
+                                        Text("Mesaj gönder")
+                                            .foregroundColor(.white.opacity(0.7))
+                                            .font(.system(size: 15))
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(.ultraThinMaterial)
+                                    .cornerRadius(25)
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(.ultraThinMaterial.opacity(0.5))
-                                .cornerRadius(25)
-                                .allowsHitTesting(false)
                                 
                                 // Beğeni Butonu
                                 Button(action: {
@@ -363,6 +369,24 @@ struct StoryViewer: View {
                 resumeTimer()
             }
         }
+        .sheet(isPresented: $showingMessageInput) {
+            MessageReplySheet(
+                storyOwnerName: currentStory?.createdByName ?? "Kullanıcı",
+                messageText: $messageText,
+                onSend: {
+                    sendMessageToChat()
+                    showingMessageInput = false
+                    resumeTimer()
+                },
+                onCancel: {
+                    showingMessageInput = false
+                    messageText = ""
+                    resumeTimer()
+                }
+            )
+            .presentationDetents([.height(200)])
+            .presentationDragIndicator(.visible)
+        }
         .onChange(of: showingDeleteAlert) { _, newValue in
             if newValue {
                 pauseTimer()
@@ -381,6 +405,39 @@ struct StoryViewer: View {
             return geometry.size.width * progress // Current
         } else {
             return 0 // Not started
+        }
+    }
+    
+    // MARK: - Send Message to Chat
+    private func sendMessageToChat() {
+        guard let currentUser = authService.currentUser,
+              let relationshipId = currentUser.relationshipId,
+              let senderId = currentUser.id,
+              !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+        
+        let trimmedMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let storyContext = "📸 Story'ye yanıt verdi"
+        let fullMessage = "\(storyContext)\n\(trimmedMessage)"
+        
+        Task {
+            do {
+                // MessageService kullanarak mesaj gönder
+                let messageService = MessageService()
+                try await messageService.sendMessage(
+                    relationshipId: relationshipId,
+                    senderId: senderId,
+                    senderName: currentUser.name,
+                    text: fullMessage
+                )
+                
+                await MainActor.run {
+                    messageText = ""
+                }
+            } catch {
+                print("❌ Story yanıtı gönderilemedi: \(error.localizedDescription)")
+            }
         }
     }
     
@@ -576,6 +633,62 @@ struct CachedAvatarView: View {
                 await MainActor.run {
                     isLoading = false
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Message Reply Sheet
+struct MessageReplySheet: View {
+    let storyOwnerName: String
+    @Binding var messageText: String
+    let onSend: () -> Void
+    let onCancel: () -> Void
+    
+    @FocusState private var isTextFieldFocused: Bool
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            // Header
+            HStack {
+                Text("\(storyOwnerName)'e yanıt ver")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Button(action: onCancel) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top)
+            
+            // Message Input
+            HStack(spacing: 12) {
+                TextField("Mesajınızı yazın...", text: $messageText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .padding(12)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(20)
+                    .focused($isTextFieldFocused)
+                    .lineLimit(3)
+                
+                Button(action: onSend) {
+                    Image(systemName: "paperplane.fill")
+                        .font(.title2)
+                        .foregroundColor(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .gray : .blue)
+                }
+                .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .padding(.horizontal)
+            .padding(.bottom)
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isTextFieldFocused = true
             }
         }
     }

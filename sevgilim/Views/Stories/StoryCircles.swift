@@ -52,6 +52,8 @@ struct StoryCircles: View {
                                         )
                                     )
                                     .frame(width: 74, height: 74)
+                                    .shimmer(isActive: !allViewed)
+                                    .pulse(isActive: !allViewed)
                                 
                                 // Avatar
                                 UserAvatarView(photoURL: currentUser.profileImageURL)
@@ -129,6 +131,8 @@ struct StoryCircles: View {
                                     )
                                 )
                                 .frame(width: 74, height: 74)
+                                .shimmer(isActive: !allViewed)
+                                .pulse(isActive: !allViewed)
                             
                             // Avatar
                             UserAvatarView(photoURL: firstPartnerStory.createdByPhotoURL)
@@ -216,5 +220,75 @@ struct UserAvatarView: View {
                         .font(.system(size: 30))
                 }
         }
+    }
+}
+
+// MARK: - Shimmer Effect Modifier
+struct ShimmerEffect: ViewModifier {
+    @State private var phase: CGFloat = 0
+    let isActive: Bool
+    
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if isActive {
+                    GeometryReader { geometry in
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0),
+                                .white.opacity(0.3),
+                                .white.opacity(0),
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .rotationEffect(.degrees(30))
+                        .offset(x: -geometry.size.width + (geometry.size.width * 2 * phase))
+                        .onAppear {
+                            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                                phase = 1
+                            }
+                        }
+                    }
+                    .clipShape(Circle())
+                }
+            }
+    }
+}
+
+// MARK: - Pulse Effect Modifier
+struct PulseEffect: ViewModifier {
+    @State private var isPulsing = false
+    let isActive: Bool
+    
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isActive && isPulsing ? 1.05 : 1.0)
+            .onAppear {
+                if isActive {
+                    withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                        isPulsing = true
+                    }
+                }
+            }
+            .onChange(of: isActive) { _, newValue in
+                if newValue {
+                    withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                        isPulsing = true
+                    }
+                } else {
+                    isPulsing = false
+                }
+            }
+    }
+}
+
+extension View {
+    func shimmer(isActive: Bool = true) -> some View {
+        modifier(ShimmerEffect(isActive: isActive))
+    }
+    
+    func pulse(isActive: Bool = true) -> some View {
+        modifier(PulseEffect(isActive: isActive))
     }
 }
