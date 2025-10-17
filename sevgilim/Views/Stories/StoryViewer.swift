@@ -64,7 +64,7 @@ struct StoryViewer: View {
             } else if let story = currentStory {
                 // Story Content
                 ZStack {
-                    // Cached Image
+                    // Cached Image - Tam ekran
                     if let image = cachedImage {
                         Image(uiImage: image)
                             .resizable()
@@ -233,7 +233,7 @@ struct StoryViewer: View {
                                     .foregroundColor(.white.opacity(0.4))
                             }
                             .padding(.horizontal, 16)
-                            .padding(.bottom, 40)
+                            .padding(.bottom, 20) // SafeArea için daha az padding
                         }
                     }
                     .zIndex(1)
@@ -242,7 +242,7 @@ struct StoryViewer: View {
                     VStack(spacing: 0) {
                         // Üst kısım boş (butonların alanı)
                         Color.clear
-                            .frame(height: 150)
+                            .frame(height: 100)
                             .allowsHitTesting(false)
                         
                         // Orta kısım - Tap Areas
@@ -280,7 +280,7 @@ struct StoryViewer: View {
                         
                         // Alt kısım boş (beğeni butonunun alanı)
                         Color.clear
-                            .frame(height: 120)
+                            .frame(height: 100)
                             .allowsHitTesting(false)
                     }
                 }
