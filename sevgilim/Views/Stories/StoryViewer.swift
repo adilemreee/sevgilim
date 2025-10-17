@@ -23,8 +23,6 @@ struct StoryViewer: View {
     @State private var dragOffset: CGFloat = 0
     @State private var showingDeleteAlert = false
     @State private var showingAddStory = false
-    @State private var showHeartAnimation = false
-    @State private var heartScale: CGFloat = 0.5
     
     private let storyDuration: TimeInterval = 5 // 5 saniye
     
@@ -90,22 +88,13 @@ struct StoryViewer: View {
                         Spacer()
                         
                         LinearGradient(
-                            colors: [.clear, .black.opacity(0.4)],
+                            colors: [.clear, .black.opacity(0.5)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        .frame(height: 100)
+                        .frame(height: 120)
                     }
                     .allowsHitTesting(false)
-                    
-                    // Kalp Animasyonu (Çift tıklama)
-                    if showHeartAnimation {
-                        Image(systemName: story.isLikedBy(userId: authService.currentUser?.id ?? "") ? "heart.fill" : "heart")
-                            .font(.system(size: 100))
-                            .foregroundColor(.white)
-                            .scaleEffect(heartScale)
-                            .opacity(showHeartAnimation ? 1 : 0)
-                    }
                     
                     // Top Content (Progress + Header)
                     VStack(spacing: 8) {
@@ -129,7 +118,7 @@ struct StoryViewer: View {
                             }
                         }
                         .padding(.horizontal, 12)
-                        .padding(.top, 55)
+                        .padding(.top, 8)
                         
                         // Header (Avatar + Name + Time)
                         HStack(spacing: 12) {
@@ -209,6 +198,49 @@ struct StoryViewer: View {
                     }
                     .zIndex(1) // Butonlar en üstte
                     
+                    // Bottom Content (Beğeni Butonları)
+                    VStack {
+                        Spacer()
+                        
+                        // Alt Bar - Instagram tarzı
+                        if story.createdBy != authService.currentUser?.id {
+                            HStack(spacing: 12) {
+                                // Mesaj Input
+                                HStack {
+                                    Text("Mesaj gönder")
+                                        .foregroundColor(.white.opacity(0.6))
+                                        .font(.system(size: 15))
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(.ultraThinMaterial)
+                                .cornerRadius(25)
+                                
+                                // Beğeni Butonu
+                                Button(action: {
+                                    handleLikeToggle()
+                                }) {
+                                    Image(systemName: story.isLikedBy(userId: authService.currentUser?.id ?? "") ? "heart.fill" : "heart")
+                                        .font(.system(size: 28, weight: .regular))
+                                        .foregroundColor(story.isLikedBy(userId: authService.currentUser?.id ?? "") ? .red : .white)
+                                }
+                                
+                                // Paylaş Butonu
+                                Button(action: {
+                                    // Paylaş fonksiyonu eklenebilir
+                                }) {
+                                    Image(systemName: "paperplane")
+                                        .font(.system(size: 26, weight: .regular))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 40)
+                        }
+                    }
+                    .zIndex(1)
+                    
                     // Tap Areas (Left = Previous, Right = Next) - Sadece orta alanda
                     VStack(spacing: 0) {
                         // Üst kısım boş (butonların alanı)
@@ -222,12 +254,6 @@ struct StoryViewer: View {
                             Rectangle()
                                 .fill(.clear)
                                 .contentShape(Rectangle())
-                                .onTapGesture(count: 2) {
-                                    // Çift tıklama - Beğen (sadece partner'ın story'si)
-                                    if story.createdBy != authService.currentUser?.id {
-                                        handleDoubleTap()
-                                    }
-                                }
                                 .onTapGesture {
                                     previousStory()
                                 }
@@ -243,12 +269,6 @@ struct StoryViewer: View {
                             Rectangle()
                                 .fill(.clear)
                                 .contentShape(Rectangle())
-                                .onTapGesture(count: 2) {
-                                    // Çift tıklama - Beğen (sadece partner'ın story'si)
-                                    if story.createdBy != authService.currentUser?.id {
-                                        handleDoubleTap()
-                                    }
-                                }
                                 .onTapGesture {
                                     nextStory()
                                 }
@@ -261,9 +281,9 @@ struct StoryViewer: View {
                                 }, perform: {})
                         }
                         
-                        // Alt kısım boş
+                        // Alt kısım boş (beğeni butonunun alanı)
                         Color.clear
-                            .frame(height: 100)
+                            .frame(height: 120)
                             .allowsHitTesting(false)
                     }
                 }
@@ -476,24 +496,10 @@ struct StoryViewer: View {
         }
     }
     
-    // Çift tıklama - Beğen/Beğenme
-    private func handleDoubleTap() {
+    // Beğeni Toggle (Butondan)
+    private func handleLikeToggle() {
         guard let story = currentStory,
               let userId = authService.currentUser?.id else { return }
-        
-        // Animasyonu göster
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-            showHeartAnimation = true
-            heartScale = 1.2
-        }
-        
-        // Animasyonu kısa süre sonra gizle
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            withAnimation(.easeOut(duration: 0.2)) {
-                showHeartAnimation = false
-                heartScale = 0.5
-            }
-        }
         
         // Firebase'de beğeni durumunu değiştir
         Task {
