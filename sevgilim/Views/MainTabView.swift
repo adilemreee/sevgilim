@@ -58,7 +58,6 @@ struct MainTabView: View {
                     Image(systemName: selectedTab == 4 ? "person.fill" : "person")
                     Text("Profil")
                 }
-                .badge(messageService.unreadCount > 0 ? messageService.unreadCount : 0)
         }
         .accentColor(themeManager.currentTheme.primaryColor)
         .onAppear {

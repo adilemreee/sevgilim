@@ -10,7 +10,7 @@ struct ChatView: View {
     @EnvironmentObject var authService: AuthenticationService
     @EnvironmentObject var relationshipService: RelationshipService
     @EnvironmentObject var themeManager: ThemeManager
-    @StateObject private var messageService = MessageService()
+    @EnvironmentObject var messageService: MessageService
     
     @State private var messageText = ""
     @State private var selectedImage: PhotosPickerItem?
@@ -108,6 +108,13 @@ struct ChatView: View {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
                     }
                 }
+                // Yeni mesajlar geldiğinde okundu olarak işaretle
+                markUnreadMessagesAsRead()
+            }
+            .onChange(of: messageService.messages.map { $0.id }) { _, _ in
+                // Mesaj listesi değiştiğinde (isRead güncellemeleri dahil)
+                // Scroll pozisyonunu koru ve okundu işaretle
+                markUnreadMessagesAsRead()
             }
         }
     }

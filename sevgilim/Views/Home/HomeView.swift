@@ -20,6 +20,7 @@ struct HomeView: View {
     @EnvironmentObject var surpriseService: SurpriseService
     @EnvironmentObject var specialDayService: SpecialDayService
     @EnvironmentObject var storyService: StoryService
+    @EnvironmentObject var messageService: MessageService
     
     @State private var currentDate = Date()
     @State private var animateHearts = false
@@ -129,12 +130,26 @@ struct HomeView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingMenu = true }) {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .padding(8)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Circle())
+                            
+                            // Badge for unread messages
+                            if messageService.unreadCount > 0 {
+                                Text("\(messageService.unreadCount)")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .frame(minWidth: 18, minHeight: 18)
+                                    .background(Color.red)
+                                    .clipShape(Circle())
+                                    .offset(x: 8, y: -4)
+                            }
+                        }
                     }
                 }
             }
@@ -147,6 +162,7 @@ struct HomeView: View {
             }
             .navigationDestination(isPresented: $navigateToChat) {
                 ChatView()
+                    .environmentObject(messageService)
             }
             .navigationDestination(isPresented: $navigateToPlaces) {
                 PlacesView()
