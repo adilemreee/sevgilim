@@ -13,10 +13,10 @@ struct AnimatedGradientBackground: View {
     var body: some View {
         LinearGradient(
             colors: [
-                theme.primaryColor.opacity(0.75),
-                theme.secondaryColor.opacity(0.68),
-                theme.accentColor.opacity(0.60),
-                theme.primaryColor.opacity(0.75)
+                theme.primaryColor.opacity(0.95),
+                theme.secondaryColor.opacity(0.9),
+                theme.accentColor.opacity(0.85),
+                theme.primaryColor.opacity(0.95)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
