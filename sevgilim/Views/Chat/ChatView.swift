@@ -149,7 +149,7 @@ struct ChatView: View {
             return
         }
         
-        messageService.listenToMessages(relationshipId: relationshipId)
+        messageService.listenToMessages(relationshipId: relationshipId, currentUserId: userId)
         messageService.listenToTypingIndicator(relationshipId: relationshipId, currentUserId: userId)
         markUnreadMessagesAsRead()
     }
@@ -319,6 +319,31 @@ struct MessageBubble: View {
             VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 4) {
                 // Message Content
                 VStack(alignment: .leading, spacing: 8) {
+                    // Story image if exists (küçük thumbnail)
+                    if let storyImageURL = message.storyImageURL {
+                        HStack(spacing: 8) {
+                            CachedAsyncImage(url: storyImageURL, thumbnail: true) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 50, height: 50)
+                                    .cornerRadius(8)
+                            } placeholder: {
+                                ZStack {
+                                    Color.gray.opacity(0.2)
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                }
+                                .frame(width: 50, height: 50)
+                                .cornerRadius(8)
+                            }
+                            
+                            Text("Story")
+                                .font(.caption)
+                                .foregroundColor(isCurrentUser ? .white.opacity(0.8) : .secondary)
+                        }
+                    }
+                    
                     // Image if exists
                     if let imageURL = message.imageURL {
                         MessageImageView(imageURL: imageURL)

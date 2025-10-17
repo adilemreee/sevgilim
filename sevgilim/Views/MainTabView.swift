@@ -18,6 +18,7 @@ struct MainTabView: View {
     @EnvironmentObject var placeService: PlaceService
     @EnvironmentObject var songService: SongService
     @EnvironmentObject var storyService: StoryService
+    @EnvironmentObject var messageService: MessageService
     
     @State private var selectedTab = 0
     
@@ -57,6 +58,7 @@ struct MainTabView: View {
                     Image(systemName: selectedTab == 4 ? "person.fill" : "person")
                     Text("Profil")
                 }
+                .badge(messageService.unreadCount > 0 ? messageService.unreadCount : 0)
         }
         .accentColor(themeManager.currentTheme.primaryColor)
         .onAppear {
@@ -79,8 +81,9 @@ struct MainTabView: View {
                     placeService.listenToPlaces(relationshipId: relationshipId)
                     songService.listenToSongs(relationshipId: relationshipId)
                     storyService.listenToStories(relationshipId: relationshipId, currentUserId: userId)
+                    messageService.listenToMessages(relationshipId: relationshipId, currentUserId: userId)
                     
-                    print("🎬 Tüm servisler başlatıldı - Story listener aktif")
+                    print("🎬 Tüm servisler başlatıldı - Story ve Message listener aktif")
                 }
             }
         }

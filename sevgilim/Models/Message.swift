@@ -13,6 +13,7 @@ struct Message: Identifiable, Codable {
     var senderName: String
     var text: String
     var imageURL: String?
+    var storyImageURL: String? // Story yanıtı için story resmi
     var timestamp: Date
     var isRead: Bool
     var readAt: Date?
@@ -24,6 +25,7 @@ struct Message: Identifiable, Codable {
         case senderName
         case text
         case imageURL
+        case storyImageURL
         case timestamp
         case isRead
         case readAt

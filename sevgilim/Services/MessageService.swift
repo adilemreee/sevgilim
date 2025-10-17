@@ -12,6 +12,7 @@ import FirebaseStorage
 class MessageService: ObservableObject {
     @Published var messages: [Message] = []
     @Published var partnerIsTyping: Bool = false
+    @Published var unreadCount: Int = 0
     
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
@@ -20,7 +21,7 @@ class MessageService: ObservableObject {
     private var typingTimer: Timer?
     
     // MARK: - Listen to Messages (Optimized)
-    func listenToMessages(relationshipId: String) {
+    func listenToMessages(relationshipId: String, currentUserId: String) {
         // Remove existing listener if any
         messagesListener?.remove()
         
@@ -46,6 +47,11 @@ class MessageService: ObservableObject {
                 
                 // Client-side sorting by timestamp (newest at bottom)
                 self.messages.sort { $0.timestamp < $1.timestamp }
+                
+                // Okunmamış mesaj sayısını hesapla (benim göndermediklerim ve okunmamışlar)
+                self.unreadCount = self.messages.filter { message in
+                    message.senderId != currentUserId && !message.isRead
+                }.count
             }
     }
     
@@ -87,7 +93,7 @@ class MessageService: ObservableObject {
     }
     
     // MARK: - Send Message
-    func sendMessage(relationshipId: String, senderId: String, senderName: String, text: String) async throws {
+    func sendMessage(relationshipId: String, senderId: String, senderName: String, text: String, storyImageURL: String? = nil) async throws {
         print("💬 Sending message: \(text)")
         
         let message = Message(
@@ -96,6 +102,7 @@ class MessageService: ObservableObject {
             senderName: senderName,
             text: text,
             imageURL: nil,
+            storyImageURL: storyImageURL,
             timestamp: Date(),
             isRead: false,
             readAt: nil

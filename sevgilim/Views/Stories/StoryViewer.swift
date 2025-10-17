@@ -410,7 +410,8 @@ struct StoryViewer: View {
     
     // MARK: - Send Message to Chat
     private func sendMessageToChat() {
-        guard let currentUser = authService.currentUser,
+        guard let story = currentStory,
+              let currentUser = authService.currentUser,
               let relationshipId = currentUser.relationshipId,
               let senderId = currentUser.id,
               !messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -423,13 +424,14 @@ struct StoryViewer: View {
         
         Task {
             do {
-                // MessageService kullanarak mesaj gönder
+                // MessageService kullanarak mesaj gönder (story thumbnail ile)
                 let messageService = MessageService()
                 try await messageService.sendMessage(
                     relationshipId: relationshipId,
                     senderId: senderId,
                     senderName: currentUser.name,
-                    text: fullMessage
+                    text: fullMessage,
+                    storyImageURL: story.thumbnailURL
                 )
                 
                 await MainActor.run {
