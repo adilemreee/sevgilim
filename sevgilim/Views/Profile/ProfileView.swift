@@ -50,6 +50,29 @@ struct ProfileView: View {
                     SignOutCard(
                         onSignOut: { showingSignOutAlert = true }
                     )
+                    
+                    // Made with Love Footer
+                    VStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "heart.fill")
+                                .font(.caption)
+                                .foregroundColor(.pink.opacity(0.6))
+                            
+                            Text("Bu uygulama aşkımmm içinnn özenle yapıldı")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .italic()
+                            
+                            Image(systemName: "heart.fill")
+                                .font(.caption)
+                                .foregroundColor(.pink.opacity(0.6))
+                        }
+                        
+                        Text("🧡")
+                            .font(.caption2)
+                    }
+                    .padding(.top, 10)
+                    .padding(.bottom, 10)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
