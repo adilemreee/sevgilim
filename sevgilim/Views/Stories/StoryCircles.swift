@@ -18,6 +18,17 @@ struct StoryCircles: View {
     @State private var showingStoryViewer = false
     @State private var showingAddStory = false
     @State private var selectedSource: StorySource = .user
+    @State private var startIndex: Int = 0
+    
+    // İlk izlenmemiş story'nin index'ini bul
+    private func getStartIndex(for stories: [Story], userId: String) -> Int {
+        // İlk izlenmemiş story'yi bul
+        if let firstUnviewed = stories.firstIndex(where: { !$0.isViewedBy(userId: userId) }) {
+            return firstUnviewed
+        }
+        // Hepsi izlenmişse baştan başla
+        return 0
+    }
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -82,8 +93,9 @@ struct StoryCircles: View {
                             }
                         }
                         .onTapGesture {
-                            if !storyService.userStories.isEmpty {
+                            if !storyService.userStories.isEmpty, let userId = authService.currentUser?.id {
                                 selectedSource = .user
+                                startIndex = getStartIndex(for: storyService.userStories, userId: userId)
                                 showingStoryViewer = true
                             } else {
                                 showingAddStory = true
@@ -139,8 +151,11 @@ struct StoryCircles: View {
                             }
                         }
                         .onTapGesture {
-                            selectedSource = .partner
-                            showingStoryViewer = true
+                            if let userId = authService.currentUser?.id {
+                                selectedSource = .partner
+                                startIndex = getStartIndex(for: storyService.partnerStories, userId: userId)
+                                showingStoryViewer = true
+                            }
                         }
                         
                         Text(firstPartnerStory.createdByName)
@@ -160,7 +175,7 @@ struct StoryCircles: View {
         .fullScreenCover(isPresented: $showingStoryViewer) {
             let stories = selectedSource == .user ? storyService.userStories : storyService.partnerStories
             if !stories.isEmpty {
-                StoryViewer(stories: stories, startIndex: 0)
+                StoryViewer(stories: stories, startIndex: startIndex)
                     .environmentObject(storyService)
                     .environmentObject(authService)
                     .environmentObject(themeManager)

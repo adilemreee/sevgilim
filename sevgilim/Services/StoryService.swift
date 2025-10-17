@@ -57,9 +57,9 @@ class StoryService: ObservableObject {
                     
                     // User ve partner story'lerini ayır (array olarak)
                     self.userStories = activeStories.filter { $0.createdBy == currentUserId }
-                        .sorted { $0.createdAt > $1.createdAt } // Yeniden eskiye
+                        .sorted { $0.createdAt < $1.createdAt } // Eskiden yeniye
                     self.partnerStories = activeStories.filter { $0.createdBy != currentUserId }
-                        .sorted { $0.createdAt > $1.createdAt } // Yeniden eskiye
+                        .sorted { $0.createdAt < $1.createdAt } // Eskiden yeniye
                 }
             }
     }
