@@ -97,7 +97,7 @@ struct StoryViewer: View {
                     .allowsHitTesting(false)
                     
                     // Top Content (Progress + Header)
-                    VStack(spacing: 12) {
+                    VStack(spacing: 8) {
                         // Progress Bars
                         HStack(spacing: 4) {
                             ForEach(0..<stories.count, id: \.self) { index in
@@ -118,7 +118,7 @@ struct StoryViewer: View {
                             }
                         }
                         .padding(.horizontal, 12)
-                        .padding(.top, 50)
+                        .padding(.top, 55)
                         
                         // Header (Avatar + Name + Time)
                         HStack(spacing: 12) {
@@ -197,6 +197,13 @@ struct StoryViewer: View {
                                 .onTapGesture {
                                     previousStory()
                                 }
+                                .onLongPressGesture(minimumDuration: 0.2, pressing: { pressing in
+                                    if pressing {
+                                        pauseTimer()
+                                    } else {
+                                        resumeTimer()
+                                    }
+                                }, perform: {})
                             
                             // Right Tap Area (Next)
                             Rectangle()
@@ -205,6 +212,13 @@ struct StoryViewer: View {
                                 .onTapGesture {
                                     nextStory()
                                 }
+                                .onLongPressGesture(minimumDuration: 0.2, pressing: { pressing in
+                                    if pressing {
+                                        pauseTimer()
+                                    } else {
+                                        resumeTimer()
+                                    }
+                                }, perform: {})
                         }
                         
                         // Alt kısım boş
@@ -215,10 +229,16 @@ struct StoryViewer: View {
                 }
                 .offset(x: dragOffset)
                 .gesture(
-                    DragGesture()
+                    DragGesture(minimumDistance: 0)
                         .onChanged { value in
-                            dragOffset = value.translation.width
-                            pauseTimer()
+                            // Eğer çok az hareket varsa (10 piksel altı), long press olarak say
+                            if abs(value.translation.width) < 10 && abs(value.translation.height) < 10 {
+                                pauseTimer()
+                            } else {
+                                // Normal drag
+                                dragOffset = value.translation.width
+                                pauseTimer()
+                            }
                         }
                         .onEnded { value in
                             if value.translation.width < -100 {
