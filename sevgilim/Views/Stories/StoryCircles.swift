@@ -5,6 +5,11 @@
 
 import SwiftUI
 
+enum StorySource {
+    case user
+    case partner
+}
+
 struct StoryCircles: View {
     @EnvironmentObject var storyService: StoryService
     @EnvironmentObject var authService: AuthenticationService
@@ -12,22 +17,24 @@ struct StoryCircles: View {
     
     @State private var showingStoryViewer = false
     @State private var showingAddStory = false
-    @State private var selectedStoryIndex = 0
+    @State private var selectedSource: StorySource = .user
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
-                // User's Story Circle (Add Story)
+                // User's Story Circle
                 if let currentUser = authService.currentUser {
                     VStack(spacing: 8) {
                         ZStack {
                             // Circle with gradient border
-                            if let userStory = storyService.userStory {
-                                // Has story - show with gradient border
+                            if !storyService.userStories.isEmpty {
+                                // Has stories - show with gradient border
+                                let allViewed = storyService.userStories.allSatisfy { $0.isViewedBy(userId: currentUser.id ?? "") }
+                                
                                 Circle()
                                     .fill(
                                         LinearGradient(
-                                            colors: userStory.isViewedBy(userId: currentUser.id ?? "") ?
+                                            colors: allViewed ?
                                                 [.gray.opacity(0.5), .gray.opacity(0.3)] :
                                                 [themeManager.currentTheme.primaryColor, themeManager.currentTheme.secondaryColor],
                                             startPoint: .topLeading,
@@ -37,62 +44,30 @@ struct StoryCircles: View {
                                     .frame(width: 74, height: 74)
                                 
                                 // Avatar
-                                if let photoURL = currentUser.profileImageURL {
-                                    AsyncImage(url: URL(string: photoURL)) { image in
-                                        image
-                                            .resizable()
-                                            .scaledToFill()
-                                    } placeholder: {
-                                        Circle()
-                                            .fill(.gray.opacity(0.3))
-                                            .overlay {
-                                                Image(systemName: "person.fill")
-                                                    .foregroundColor(.white)
-                                            }
-                                    }
-                                    .frame(width: 68, height: 68)
-                                    .clipShape(Circle())
-                                } else {
-                                    Circle()
-                                        .fill(.gray.opacity(0.3))
-                                        .frame(width: 68, height: 68)
+                                UserAvatarView(photoURL: currentUser.profileImageURL)
+                                
+                                // Story count badge
+                                if storyService.userStories.count > 1 {
+                                    Text("\(storyService.userStories.count)")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                        .frame(width: 22, height: 22)
+                                        .background(themeManager.currentTheme.primaryColor)
+                                        .clipShape(Circle())
                                         .overlay {
-                                            Image(systemName: "person.fill")
-                                                .foregroundColor(.white)
-                                                .font(.system(size: 30))
+                                            Circle()
+                                                .stroke(.white, lineWidth: 2)
                                         }
+                                        .offset(x: 25, y: -25)
                                 }
                             } else {
                                 // No story - show add button
                                 Circle()
                                     .fill(.gray.opacity(0.2))
-                                    .frame(width: 68, height: 68)
+                                    .frame(width: 74, height: 74)
                                 
-                                if let photoURL = currentUser.profileImageURL {
-                                    AsyncImage(url: URL(string: photoURL)) { image in
-                                        image
-                                            .resizable()
-                                            .scaledToFill()
-                                    } placeholder: {
-                                        Circle()
-                                            .fill(.gray.opacity(0.3))
-                                            .overlay {
-                                                Image(systemName: "person.fill")
-                                                    .foregroundColor(.white)
-                                            }
-                                    }
-                                    .frame(width: 68, height: 68)
-                                    .clipShape(Circle())
-                                } else {
-                                    Circle()
-                                        .fill(.gray.opacity(0.3))
-                                        .frame(width: 68, height: 68)
-                                        .overlay {
-                                            Image(systemName: "person.fill")
-                                                .foregroundColor(.white)
-                                                .font(.system(size: 30))
-                                        }
-                                }
+                                UserAvatarView(photoURL: currentUser.profileImageURL)
                                 
                                 // Plus button
                                 Circle()
@@ -107,12 +82,10 @@ struct StoryCircles: View {
                             }
                         }
                         .onTapGesture {
-                            if storyService.userStory != nil {
-                                // Show user's story
-                                selectedStoryIndex = 0
+                            if !storyService.userStories.isEmpty {
+                                selectedSource = .user
                                 showingStoryViewer = true
                             } else {
-                                // Add new story
                                 showingAddStory = true
                             }
                         }
@@ -126,15 +99,18 @@ struct StoryCircles: View {
                 }
                 
                 // Partner's Story Circle
-                if let partnerStory = storyService.partnerStory,
-                   let currentUserId = authService.currentUser?.id {
+                if !storyService.partnerStories.isEmpty,
+                   let currentUserId = authService.currentUser?.id,
+                   let firstPartnerStory = storyService.partnerStories.first {
                     VStack(spacing: 8) {
                         ZStack {
                             // Circle with gradient border
+                            let allViewed = storyService.partnerStories.allSatisfy { $0.isViewedBy(userId: currentUserId) }
+                            
                             Circle()
                                 .fill(
                                     LinearGradient(
-                                        colors: partnerStory.isViewedBy(userId: currentUserId) ?
+                                        colors: allViewed ?
                                             [.gray.opacity(0.5), .gray.opacity(0.3)] :
                                             [.pink, .purple],
                                         startPoint: .topLeading,
@@ -144,43 +120,30 @@ struct StoryCircles: View {
                                 .frame(width: 74, height: 74)
                             
                             // Avatar
-                            if let photoURL = partnerStory.createdByPhotoURL {
-                                AsyncImage(url: URL(string: photoURL)) { image in
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                } placeholder: {
-                                    Circle()
-                                        .fill(.gray.opacity(0.3))
-                                        .overlay {
-                                            Image(systemName: "person.fill")
-                                                .foregroundColor(.white)
-                                        }
-                                }
-                                .frame(width: 68, height: 68)
-                                .clipShape(Circle())
-                            } else {
-                                Circle()
-                                    .fill(LinearGradient(
-                                        colors: [.pink, .purple],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ))
-                                    .frame(width: 68, height: 68)
+                            UserAvatarView(photoURL: firstPartnerStory.createdByPhotoURL)
+                            
+                            // Story count badge
+                            if storyService.partnerStories.count > 1 {
+                                Text("\(storyService.partnerStories.count)")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .frame(width: 22, height: 22)
+                                    .background(Color.pink)
+                                    .clipShape(Circle())
                                     .overlay {
-                                        Image(systemName: "heart.fill")
-                                            .foregroundColor(.white)
-                                            .font(.system(size: 30))
+                                        Circle()
+                                            .stroke(.white, lineWidth: 2)
                                     }
+                                    .offset(x: 25, y: -25)
                             }
                         }
                         .onTapGesture {
-                            // Show partner's story
-                            selectedStoryIndex = storyService.userStory != nil ? 1 : 0
+                            selectedSource = .partner
                             showingStoryViewer = true
                         }
                         
-                        Text(partnerStory.createdByName)
+                        Text(firstPartnerStory.createdByName)
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
@@ -195,24 +158,52 @@ struct StoryCircles: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
         .fullScreenCover(isPresented: $showingStoryViewer) {
-            if !allStories.isEmpty {
-                StoryViewer(stories: allStories, startIndex: selectedStoryIndex)
+            let stories = selectedSource == .user ? storyService.userStories : storyService.partnerStories
+            if !stories.isEmpty {
+                StoryViewer(stories: stories, startIndex: 0)
+                    .environmentObject(storyService)
+                    .environmentObject(authService)
+                    .environmentObject(themeManager)
             }
         }
         .sheet(isPresented: $showingAddStory) {
             AddStoryView()
+                .environmentObject(storyService)
+                .environmentObject(authService)
+                .environmentObject(themeManager)
         }
     }
+}
+
+// MARK: - User Avatar View
+struct UserAvatarView: View {
+    let photoURL: String?
     
-    // All stories in order (user first, then partner)
-    private var allStories: [Story] {
-        var stories: [Story] = []
-        if let userStory = storyService.userStory {
-            stories.append(userStory)
+    var body: some View {
+        if let photoURL = photoURL {
+            AsyncImage(url: URL(string: photoURL)) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+            } placeholder: {
+                Circle()
+                    .fill(.gray.opacity(0.3))
+                    .overlay {
+                        Image(systemName: "person.fill")
+                            .foregroundColor(.white)
+                    }
+            }
+            .frame(width: 68, height: 68)
+            .clipShape(Circle())
+        } else {
+            Circle()
+                .fill(.gray.opacity(0.3))
+                .frame(width: 68, height: 68)
+                .overlay {
+                    Image(systemName: "person.fill")
+                        .foregroundColor(.white)
+                        .font(.system(size: 30))
+                }
         }
-        if let partnerStory = storyService.partnerStory {
-            stories.append(partnerStory)
-        }
-        return stories
     }
 }

@@ -61,22 +61,27 @@ struct MainTabView: View {
         .accentColor(themeManager.currentTheme.primaryColor)
         .onAppear {
             // Tüm servislerin listener'larını başlat
-            if let currentUser = authService.currentUser,
-               let userId = currentUser.id,
-               let relationshipId = currentUser.relationshipId {
-                
-                // Sürpriz servisini başlat
-                surpriseService.listenToSurprises(relationshipId: relationshipId, userId: userId)
-                
-                // Diğer servisleri de başlat
-                memoryService.listenToMemories(relationshipId: relationshipId)
-                photoService.listenToPhotos(relationshipId: relationshipId)
-                noteService.listenToNotes(relationshipId: relationshipId)
-                planService.listenToPlans(relationshipId: relationshipId)
-                movieService.listenToMovies(relationshipId: relationshipId)
-                placeService.listenToPlaces(relationshipId: relationshipId)
-                songService.listenToSongs(relationshipId: relationshipId)
-                storyService.listenToStories(relationshipId: relationshipId, currentUserId: userId)
+            // Küçük delay ile auth'un tamamlanmasını bekle
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if let currentUser = authService.currentUser,
+                   let userId = currentUser.id,
+                   let relationshipId = currentUser.relationshipId {
+                    
+                    // Sürpriz servisini başlat
+                    surpriseService.listenToSurprises(relationshipId: relationshipId, userId: userId)
+                    
+                    // Diğer servisleri de başlat
+                    memoryService.listenToMemories(relationshipId: relationshipId)
+                    photoService.listenToPhotos(relationshipId: relationshipId)
+                    noteService.listenToNotes(relationshipId: relationshipId)
+                    planService.listenToPlans(relationshipId: relationshipId)
+                    movieService.listenToMovies(relationshipId: relationshipId)
+                    placeService.listenToPlaces(relationshipId: relationshipId)
+                    songService.listenToSongs(relationshipId: relationshipId)
+                    storyService.listenToStories(relationshipId: relationshipId, currentUserId: userId)
+                    
+                    print("🎬 Tüm servisler başlatıldı - Story listener aktif")
+                }
             }
         }
     }

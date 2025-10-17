@@ -11,8 +11,8 @@ import UIKit
 
 class StoryService: ObservableObject {
     @Published var stories: [Story] = []
-    @Published var userStory: Story? // Kullanıcının story'si
-    @Published var partnerStory: Story? // Partner'ın story'si
+    @Published var userStories: [Story] = [] // Kullanıcının tüm story'leri
+    @Published var partnerStories: [Story] = [] // Partner'ın tüm story'leri
     
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
@@ -55,9 +55,11 @@ class StoryService: ObservableObject {
                 DispatchQueue.main.async {
                     self.stories = activeStories
                     
-                    // User ve partner story'lerini ayır
-                    self.userStory = activeStories.first { $0.createdBy == currentUserId }
-                    self.partnerStory = activeStories.first { $0.createdBy != currentUserId }
+                    // User ve partner story'lerini ayır (array olarak)
+                    self.userStories = activeStories.filter { $0.createdBy == currentUserId }
+                        .sorted { $0.createdAt > $1.createdAt } // Yeniden eskiye
+                    self.partnerStories = activeStories.filter { $0.createdBy != currentUserId }
+                        .sorted { $0.createdAt > $1.createdAt } // Yeniden eskiye
                 }
             }
     }
@@ -173,14 +175,14 @@ class StoryService: ObservableObject {
         
         if let story = try? document.data(as: Story.self) {
             // Storage'dan fotoğrafı sil
-            if let photoURL = URL(string: story.photoURL) {
+            if URL(string: story.photoURL) != nil {
                 let photoRef = storage.reference(forURL: story.photoURL)
                 try? await photoRef.delete()
             }
             
             // Thumbnail'ı sil
             if let thumbnailURL = story.thumbnailURL,
-               let url = URL(string: thumbnailURL) {
+               URL(string: thumbnailURL) != nil {
                 let thumbRef = storage.reference(forURL: thumbnailURL)
                 try? await thumbRef.delete()
             }
@@ -192,8 +194,9 @@ class StoryService: ObservableObject {
     
     // Kullanıcının story'sini sil
     func deleteUserStory(userId: String) async throws {
-        if let userStory = userStory, userStory.createdBy == userId {
-            try await deleteStory(storyId: userStory.id ?? "")
+        let userStories = userStories.filter { $0.createdBy == userId }
+        for story in userStories {
+            try await deleteStory(storyId: story.id ?? "")
         }
     }
     
