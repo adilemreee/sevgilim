@@ -16,6 +16,7 @@ struct Story: Identifiable, Codable {
     let relationshipId: String
     let createdAt: Date
     var viewedBy: [String] // userId array
+    var likedBy: [String]? // userId array - kim beğendi (optional - eski story'ler için)
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -27,6 +28,35 @@ struct Story: Identifiable, Codable {
         case relationshipId
         case createdAt
         case viewedBy
+        case likedBy
+    }
+    
+    // Codable init - likedBy yoksa boş array yap
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        _id = try container.decode(DocumentID<String>.self, forKey: .id)
+        photoURL = try container.decode(String.self, forKey: .photoURL)
+        thumbnailURL = try container.decodeIfPresent(String.self, forKey: .thumbnailURL)
+        createdBy = try container.decode(String.self, forKey: .createdBy)
+        createdByName = try container.decode(String.self, forKey: .createdByName)
+        createdByPhotoURL = try container.decodeIfPresent(String.self, forKey: .createdByPhotoURL)
+        relationshipId = try container.decode(String.self, forKey: .relationshipId)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        viewedBy = try container.decode([String].self, forKey: .viewedBy)
+        likedBy = try container.decodeIfPresent([String].self, forKey: .likedBy) ?? []
+    }
+    
+    // Normal init
+    init(photoURL: String, thumbnailURL: String?, createdBy: String, createdByName: String, createdByPhotoURL: String?, relationshipId: String, createdAt: Date, viewedBy: [String], likedBy: [String]?) {
+        self.photoURL = photoURL
+        self.thumbnailURL = thumbnailURL
+        self.createdBy = createdBy
+        self.createdByName = createdByName
+        self.createdByPhotoURL = createdByPhotoURL
+        self.relationshipId = relationshipId
+        self.createdAt = createdAt
+        self.viewedBy = viewedBy
+        self.likedBy = likedBy ?? []
     }
     
     // 24 saat geçti mi?
@@ -73,5 +103,10 @@ struct Story: Identifiable, Codable {
     // Bu user story'yi gördü mü?
     func isViewedBy(userId: String) -> Bool {
         return viewedBy.contains(userId)
+    }
+    
+    // Bu user story'yi beğendi mi?
+    func isLikedBy(userId: String) -> Bool {
+        return likedBy?.contains(userId) ?? false
     }
 }

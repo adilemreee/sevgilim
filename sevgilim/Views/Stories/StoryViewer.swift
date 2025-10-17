@@ -23,6 +23,8 @@ struct StoryViewer: View {
     @State private var dragOffset: CGFloat = 0
     @State private var showingDeleteAlert = false
     @State private var showingAddStory = false
+    @State private var showHeartAnimation = false
+    @State private var heartScale: CGFloat = 0.5
     
     private let storyDuration: TimeInterval = 5 // 5 saniye
     
@@ -96,6 +98,15 @@ struct StoryViewer: View {
                     }
                     .allowsHitTesting(false)
                     
+                    // Kalp Animasyonu (Çift tıklama)
+                    if showHeartAnimation {
+                        Image(systemName: story.isLikedBy(userId: authService.currentUser?.id ?? "") ? "heart.fill" : "heart")
+                            .font(.system(size: 100))
+                            .foregroundColor(.white)
+                            .scaleEffect(heartScale)
+                            .opacity(showHeartAnimation ? 1 : 0)
+                    }
+                    
                     // Top Content (Progress + Header)
                     VStack(spacing: 8) {
                         // Progress Bars
@@ -136,6 +147,23 @@ struct StoryViewer: View {
                             }
                             
                             Spacer()
+                            
+                            // Beğeni Göstergesi (kendi story'inde partner beğendiyse)
+                            if story.createdBy == authService.currentUser?.id,
+                               let likedBy = story.likedBy, !likedBy.isEmpty {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "heart.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.red)
+                                    Text("\(likedBy.count)")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.white)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Capsule())
+                            }
                             
                             // Add Story Button (only for own stories)
                             if story.createdBy == authService.currentUser?.id {
@@ -194,6 +222,12 @@ struct StoryViewer: View {
                             Rectangle()
                                 .fill(.clear)
                                 .contentShape(Rectangle())
+                                .onTapGesture(count: 2) {
+                                    // Çift tıklama - Beğen (sadece partner'ın story'si)
+                                    if story.createdBy != authService.currentUser?.id {
+                                        handleDoubleTap()
+                                    }
+                                }
                                 .onTapGesture {
                                     previousStory()
                                 }
@@ -209,6 +243,12 @@ struct StoryViewer: View {
                             Rectangle()
                                 .fill(.clear)
                                 .contentShape(Rectangle())
+                                .onTapGesture(count: 2) {
+                                    // Çift tıklama - Beğen (sadece partner'ın story'si)
+                                    if story.createdBy != authService.currentUser?.id {
+                                        handleDoubleTap()
+                                    }
+                                }
                                 .onTapGesture {
                                     nextStory()
                                 }
@@ -432,6 +472,35 @@ struct StoryViewer: View {
                 }
             } catch {
                 print("❌ Story silinemedi: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    // Çift tıklama - Beğen/Beğenme
+    private func handleDoubleTap() {
+        guard let story = currentStory,
+              let userId = authService.currentUser?.id else { return }
+        
+        // Animasyonu göster
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            showHeartAnimation = true
+            heartScale = 1.2
+        }
+        
+        // Animasyonu kısa süre sonra gizle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            withAnimation(.easeOut(duration: 0.2)) {
+                showHeartAnimation = false
+                heartScale = 0.5
+            }
+        }
+        
+        // Firebase'de beğeni durumunu değiştir
+        Task {
+            do {
+                try await storyService.toggleLike(storyId: story.id ?? "", userId: userId)
+            } catch {
+                print("❌ Beğeni güncellenemedi: \(error.localizedDescription)")
             }
         }
     }

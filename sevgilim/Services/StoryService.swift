@@ -87,7 +87,8 @@ class StoryService: ObservableObject {
             createdByPhotoURL: userPhotoURL,
             relationshipId: relationshipId,
             createdAt: Date(),
-            viewedBy: [userId] // Oluşturan kişi otomatik görülmüş sayılır
+            viewedBy: [userId], // Oluşturan kişi otomatik görülmüş sayılır
+            likedBy: [] // Başlangıçta beğeni yok
         )
         
         // Firestore'a kaydet
@@ -211,6 +212,33 @@ class StoryService: ObservableObject {
                 try await deleteStory(storyId: story.id ?? "")
             }
         }
+    }
+    
+    // Story'yi beğen/beğenmekten vazgeç
+    func toggleLike(storyId: String, userId: String) async throws {
+        guard let docId = storyId as String? else { return }
+        let storyRef = db.collection("stories").document(docId)
+        
+        // Mevcut story'yi al
+        let document = try await storyRef.getDocument()
+        guard var story = try? document.data(as: Story.self) else { return }
+        
+        // likedBy'ı initialize et (eski story'ler için)
+        var currentLikedBy = story.likedBy ?? []
+        
+        // Beğeni durumunu değiştir
+        if currentLikedBy.contains(userId) {
+            // Beğeniyi kaldır
+            currentLikedBy.removeAll { $0 == userId }
+        } else {
+            // Beğen
+            currentLikedBy.append(userId)
+        }
+        
+        // Firestore'u güncelle
+        try await storyRef.updateData([
+            "likedBy": currentLikedBy
+        ])
     }
     
     // Listener'ı durdur
