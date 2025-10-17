@@ -6,6 +6,8 @@
 import SwiftUI
 import Combine
 
+
+
 struct HomeView: View {
     @EnvironmentObject var authService: AuthenticationService
     @EnvironmentObject var relationshipService: RelationshipService
@@ -129,30 +131,21 @@ struct HomeView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingMenu = true }) {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.title3)
-                                .foregroundColor(.white)
-                                .padding(8)
-                                .background(.ultraThinMaterial)
-                                .clipShape(Circle())
-                            
-                            // Badge for unread messages
-                            if messageService.unreadCount > 0 {
-                                Text("\(messageService.unreadCount)")
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                    .frame(minWidth: 18, minHeight: 18)
-                                    .background(Color.red)
-                                    .clipShape(Circle())
-                                    .offset(x: 8, y: -4)
-                            }
-                        }
+                    Button {
+                        showingMenu = true
+                    } label: {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .buttonStyle(.plain)
+                    .if(messageService.unreadCount > 0) { view in
+                        view.badge(messageService.unreadCount)
                     }
                 }
             }
+
+
             .toolbarBackground(.hidden, for: .navigationBar)
             .navigationDestination(isPresented: $navigateToPlans) {
                 PlansView()
@@ -1159,6 +1152,18 @@ struct UpcomingSpecialDayWidget: View {
             ) {
                 pulseAnimation = true
             }
+        }
+    }
+}
+
+// MARK: - View Extension for Conditional Modifier
+extension View {
+    @ViewBuilder
+    func `if`<Transform: View>(_ condition: Bool, transform: (Self) -> Transform) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
         }
     }
 }

@@ -102,6 +102,12 @@ struct ChatView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
+            .onAppear {
+                // İlk açılışta son mesaja direkt git (animasyonsuz)
+                if let lastMessage = messageService.messages.last {
+                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                }
+            }
             .onChange(of: messageService.messages.count) { _, _ in
                 if let lastMessage = messageService.messages.last {
                     withAnimation {
