@@ -19,6 +19,8 @@ struct SurpriseCardView: View {
     @State private var giftScale: CGFloat = 1.0
     @State private var contentOpacity: Double = 0
     @State private var timer: AnyCancellable?
+    @State private var cachedImage: UIImage?
+    @State private var isLoadingImage = false
     
     var body: some View {
         ZStack {
@@ -36,6 +38,7 @@ struct SurpriseCardView: View {
         .onAppear {
             setupTimer()
             checkAndReveal()
+            loadCachedImage()
         }
         .onDisappear {
             timer?.cancel()
@@ -286,29 +289,30 @@ struct SurpriseCardView: View {
                             .lineLimit(isCreatedByCurrentUser ? 2 : nil)
                     }
                     
-                    // Fotoğraf
-                    if let photoURL = surprise.photoURL, !isCreatedByCurrentUser {
-                        AsyncImage(url: URL(string: photoURL)) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
+                    // Fotoğraf (Cached)
+                    if let _ = surprise.photoURL, !isCreatedByCurrentUser {
+                        if let cachedImage = cachedImage {
+                            Image(uiImage: cachedImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 180)
+                                .cornerRadius(12)
+                                .clipped()
+                        } else if isLoadingImage {
+                            ZStack {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.1))
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 180)
-                                    .cornerRadius(12)
-                                    .clipped()
-                            case .failure(_):
-                                placeholderImage
-                            case .empty:
+                                
                                 ProgressView()
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 180)
-                            @unknown default:
-                                placeholderImage
+                                    .tint(.white)
                             }
+                            .cornerRadius(12)
+                        } else {
+                            placeholderImage
                         }
-                        .padding(.top, 4)
                     }
                 }
                 
@@ -480,6 +484,29 @@ struct SurpriseCardView: View {
             .repeatForever(autoreverses: false)
         ) {
             giftRotation = 10
+        }
+    }
+    
+    // MARK: - Load Cached Image
+    
+    private func loadCachedImage() {
+        guard let photoURL = surprise.photoURL, !isCreatedByCurrentUser else { return }
+        
+        isLoadingImage = true
+        
+        Task {
+            do {
+                let image = try await ImageCacheService.shared.loadImage(from: photoURL, thumbnail: true)
+                await MainActor.run {
+                    self.cachedImage = image
+                    self.isLoadingImage = false
+                }
+            } catch {
+                print("❌ Error loading cached image: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.isLoadingImage = false
+                }
+            }
         }
     }
 }

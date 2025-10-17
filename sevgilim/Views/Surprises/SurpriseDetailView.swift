@@ -18,6 +18,9 @@ struct SurpriseDetailView: View {
     @State private var timeRemaining: TimeInterval = 0
     @State private var timer: AnyCancellable?
     @State private var showDeleteAlert = false
+    @State private var cachedImage: UIImage?
+    @State private var isLoadingImage = false
+    @State private var showFullScreenPhoto = false
     
     var body: some View {
         NavigationView {
@@ -82,8 +85,16 @@ struct SurpriseDetailView: View {
             } message: {
                 Text("Bu sürprizi silmek istediğinizden emin misiniz?")
             }
+            .fullScreenCover(isPresented: $showFullScreenPhoto) {
+                if let cachedImage = cachedImage {
+                    SimpleSurprisePhotoViewer(image: cachedImage, dismiss: {
+                        showFullScreenPhoto = false
+                    })
+                }
+            }
             .onAppear {
                 setupTimer()
+                loadCachedImage()
             }
             .onDisappear {
                 timer?.cancel()
@@ -269,36 +280,39 @@ struct SurpriseDetailView: View {
             }
             
             // Fotoğraf
-            if let photoURL = surprise.photoURL, let url = URL(string: photoURL) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 250)
-                            .background(Color(.systemGray6))
+            if let photoURL = surprise.photoURL {
+                Button(action: { showFullScreenPhoto = true }) {
+                    Group {
+                        if let cachedImage = cachedImage {
+                            Image(uiImage: cachedImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: .infinity)
+                                .frame(maxHeight: 400)
+                                .cornerRadius(16)
+                                .shadow(color: .black.opacity(0.2), radius: 8)
+                        } else if isLoadingImage {
+                            ZStack {
+                                Rectangle()
+                                    .fill(Color(.systemGray6))
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 250)
+                                
+                                ProgressView()
+                            }
                             .cornerRadius(16)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 250)
-                            .clipped()
-                            .cornerRadius(16)
-                            .shadow(color: .black.opacity(0.2), radius: 8)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .font(.largeTitle)
-                            .foregroundColor(.gray)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 250)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(16)
-                    @unknown default:
-                        EmptyView()
+                        } else {
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundColor(.gray)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 250)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(16)
+                        }
                     }
                 }
+                .buttonStyle(PlainButtonStyle())
             }
             
             // Mesaj
@@ -427,6 +441,29 @@ struct SurpriseDetailView: View {
             }
     }
     
+    // MARK: - Load Cached Image
+    
+    private func loadCachedImage() {
+        guard let photoURL = surprise.photoURL else { return }
+        
+        isLoadingImage = true
+        
+        Task {
+            do {
+                let image = try await ImageCacheService.shared.loadImage(from: photoURL)
+                await MainActor.run {
+                    self.cachedImage = image
+                    self.isLoadingImage = false
+                }
+            } catch {
+                print("❌ Error loading cached image: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.isLoadingImage = false
+                }
+            }
+        }
+    }
+    
     // MARK: - Delete Surprise
     
     private func deleteSurprise() async {
@@ -435,6 +472,88 @@ struct SurpriseDetailView: View {
             dismiss()
         } catch {
             print("❌ Sürpriz silinirken hata: \(error.localizedDescription)")
+        }
+    }
+}
+
+// MARK: - Simple Photo Viewer
+struct SimpleSurprisePhotoViewer: View {
+    let image: UIImage
+    let dismiss: () -> Void
+    
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .scaleEffect(scale)
+                .offset(offset)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            let delta = value / lastScale
+                            lastScale = value
+                            scale = max(1.0, min(scale * delta, 4.0))
+                        }
+                        .onEnded { _ in
+                            lastScale = 1.0
+                            if scale < 1.0 {
+                                withAnimation(.spring()) {
+                                    scale = 1.0
+                                    offset = .zero
+                                }
+                            }
+                        }
+                )
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            if scale > 1.0 {
+                                offset = CGSize(
+                                    width: lastOffset.width + value.translation.width,
+                                    height: lastOffset.height + value.translation.height
+                                )
+                            }
+                        }
+                        .onEnded { _ in
+                            lastOffset = offset
+                        }
+                )
+            
+            // Close Button
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: dismiss) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.black.opacity(0.5))
+                            .clipShape(Circle())
+                    }
+                    .padding()
+                }
+                Spacer()
+            }
+        }
+        .onTapGesture(count: 2) {
+            withAnimation(.spring()) {
+                if scale > 1.0 {
+                    scale = 1.0
+                    offset = .zero
+                    lastOffset = .zero
+                } else {
+                    scale = 2.0
+                }
+            }
         }
     }
 }

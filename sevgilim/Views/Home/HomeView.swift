@@ -512,27 +512,38 @@ struct StatCardModern: View {
     @State private var animateCard = false
     
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
+        HStack(spacing: 12) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.2))
+                    .frame(width: 40, height: 40)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(color)
+            }
             
-            Text(value)
-                .font(.title)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
+            // Content
+            VStack(alignment: .leading, spacing: 2) {
+                Text(value)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+            }
             
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.8))
-                .multilineTextAlignment(.center)
+            Spacer()
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15))
-        .scaleEffect(animateCard ? 1.05 : 1.0)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .scaleEffect(animateCard ? 1.02 : 1.0)
         .onTapGesture {
-            // Lightweight animation
             withAnimation(.easeInOut(duration: 0.15)) {
                 animateCard = true
             }
