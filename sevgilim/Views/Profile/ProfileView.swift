@@ -242,7 +242,7 @@ struct RelationshipInfoCard: View {
     }
 }
 
-struct InfoRow: View {
+private struct InfoRow: View {
     let icon: String
     let title: String
     let value: String

@@ -21,6 +21,7 @@ struct sevgilimApp: App {
     @StateObject private var songService = SongService()
     @StateObject private var spotifyService = SpotifyService()
     @StateObject private var surpriseService = SurpriseService()
+    @StateObject private var specialDayService = SpecialDayService()
     @StateObject private var themeManager = ThemeManager()
     
     
@@ -38,6 +39,7 @@ struct sevgilimApp: App {
                 .environmentObject(songService)
                 .environmentObject(spotifyService)
                 .environmentObject(surpriseService)
+                .environmentObject(specialDayService)
                 .environmentObject(themeManager)
                 
         }

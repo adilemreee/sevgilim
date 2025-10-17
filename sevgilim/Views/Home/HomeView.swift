@@ -18,6 +18,7 @@ struct HomeView: View {
     @EnvironmentObject var placeService: PlaceService
     @EnvironmentObject var songService: SongService
     @EnvironmentObject var surpriseService: SurpriseService
+    @EnvironmentObject var specialDayService: SpecialDayService
     
     @State private var currentDate = Date()
     @State private var animateHearts = false
@@ -28,6 +29,7 @@ struct HomeView: View {
     @State private var navigateToPlaces = false
     @State private var navigateToSongs = false
     @State private var navigateToSurprises = false
+    @State private var navigateToSpecialDays = false
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     
     var body: some View {
@@ -69,6 +71,17 @@ struct HomeView: View {
                                 plansCount: planService.plans.count,
                                 theme: themeManager.currentTheme
                             )
+                            
+                            // Upcoming Special Day Widget
+                            if let nextDay = specialDayService.nextSpecialDay(),
+                               nextDay.daysUntil <= 30 {
+                                UpcomingSpecialDayWidget(
+                                    specialDay: nextDay,
+                                    onTap: {
+                                        navigateToSpecialDays = true
+                                    }
+                                )
+                            }
                             
                             // Recent Memories Preview
                             if !memoryService.memories.isEmpty {
@@ -139,6 +152,9 @@ struct HomeView: View {
             .navigationDestination(isPresented: $navigateToSurprises) {
                 SurprisesView()
             }
+            .navigationDestination(isPresented: $navigateToSpecialDays) {
+                SpecialDaysView()
+            }
             .sheet(isPresented: $showingMenu) {
                 HamburgerMenuView(
                     onPlansSelected: {
@@ -176,6 +192,12 @@ struct HomeView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             navigateToSurprises = true
                         }
+                    },
+                    onSpecialDaysSelected: {
+                        showingMenu = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            navigateToSpecialDays = true
+                        }
                     }
                 )
                 .environmentObject(themeManager)
@@ -184,7 +206,8 @@ struct HomeView: View {
                 .environmentObject(placeService)
                 .environmentObject(songService)
                 .environmentObject(surpriseService)
-                .presentationDetents([.height(500)])
+                .environmentObject(specialDayService)
+                .presentationDetents([.height(600)])
                 .presentationDragIndicator(.visible)
             }
             .onReceive(timer) { _ in
@@ -194,6 +217,7 @@ struct HomeView: View {
                 // Use task for better lifecycle management
                 if let relationshipId = authService.currentUser?.relationshipId {
                     relationshipService.listenToRelationship(relationshipId: relationshipId)
+                    specialDayService.listenToSpecialDays(relationshipId: relationshipId)
                 }
                 
                 // Start heart animation
@@ -635,6 +659,7 @@ struct HamburgerMenuView: View {
     @EnvironmentObject var placeService: PlaceService
     @EnvironmentObject var songService: SongService
     @EnvironmentObject var surpriseService: SurpriseService
+    @EnvironmentObject var specialDayService: SpecialDayService
     
     let onPlansSelected: () -> Void
     let onMoviesSelected: () -> Void
@@ -642,6 +667,7 @@ struct HamburgerMenuView: View {
     let onPlacesSelected: () -> Void
     let onSongsSelected: () -> Void
     let onSurprisesSelected: () -> Void
+    let onSpecialDaysSelected: () -> Void
     
     var body: some View {
         VStack(spacing: 0) {
@@ -686,6 +712,14 @@ struct HamburgerMenuView: View {
                     count: surpriseService.surprises.count,
                     theme: themeManager.currentTheme,
                     action: onSurprisesSelected
+                )
+                
+                MinimalMenuButton(
+                    icon: "calendar.badge.clock",
+                    title: "Özel Günler",
+                    count: specialDayService.specialDays.count,
+                    theme: themeManager.currentTheme,
+                    action: onSpecialDaysSelected
                 )
                 
                 MinimalMenuButton(
@@ -961,6 +995,138 @@ struct PartnerSurpriseHomeCard: View {
             .repeatForever(autoreverses: true)
         ) {
             pulseAnimation = true
+        }
+    }
+}
+
+// MARK: - Upcoming Special Day Widget
+struct UpcomingSpecialDayWidget: View {
+    let specialDay: SpecialDay
+    let onTap: () -> Void
+    
+    @State private var pulseAnimation = false
+    
+    private var cardColor: Color {
+        switch specialDay.color {
+        case "red": return .red
+        case "orange": return .orange
+        case "pink": return .pink
+        case "purple": return .purple
+        case "blue": return .blue
+        case "indigo": return .indigo
+        case "cyan": return .cyan
+        case "yellow": return .yellow
+        case "mint": return .mint
+        default: return .gray
+        }
+    }
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: specialDay.icon)
+                            .font(.body)
+                            .foregroundColor(cardColor)
+                        Text(specialDay.isToday ? "Bugün Özel Gün!" : "Yaklaşan Özel Gün")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+                
+                Divider()
+                    .background(Color.white.opacity(0.2))
+                    .padding(.horizontal, 20)
+                
+                // Content
+                HStack(spacing: 16) {
+                    // Icon with days
+                    VStack(spacing: 4) {
+                        ZStack {
+                            Circle()
+                                .fill(cardColor.gradient)
+                                .frame(width: 70, height: 70)
+                                .scaleEffect(pulseAnimation ? 1.1 : 1.0)
+                            
+                            Image(systemName: specialDay.icon)
+                                .font(.title2)
+                                .foregroundColor(.white)
+                        }
+                        
+                        if !specialDay.isToday {
+                            VStack(spacing: 2) {
+                                Text("\(specialDay.daysUntil)")
+                                    .font(.title3.bold())
+                                    .foregroundColor(.white)
+                                Text("gün")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                        } else {
+                            Text("🎉")
+                                .font(.title2)
+                        }
+                    }
+                    
+                    // Info
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(specialDay.title)
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                        
+                        Text(specialDay.category.rawValue)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar")
+                                .font(.caption2)
+                            Text(specialDay.displayDate, style: .date)
+                                .font(.caption)
+                            
+                            if specialDay.isRecurring {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.caption2)
+                            }
+                        }
+                        .foregroundColor(.white.opacity(0.7))
+                    }
+                    
+                    Spacer()
+                }
+                .padding(20)
+            }
+            .frame(maxWidth: .infinity)
+            .background(
+                LinearGradient(
+                    colors: [cardColor.opacity(0.3), cardColor.opacity(0.15)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+            .shadow(color: cardColor.opacity(0.3), radius: 15, x: 0, y: 5)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onAppear {
+            withAnimation(
+                .easeInOut(duration: 1.5)
+                .repeatForever(autoreverses: true)
+            ) {
+                pulseAnimation = true
+            }
         }
     }
 }
