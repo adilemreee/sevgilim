@@ -14,6 +14,8 @@ struct AddStoryView: View {
     
     @State private var selectedImage: UIImage?
     @State private var showingImagePicker = false
+    @State private var showingCamera = false
+    @State private var showingSourceOptions = false
     @State private var isUploading = false
     @State private var showingError = false
     @State private var errorMessage = ""
@@ -77,7 +79,7 @@ struct AddStoryView: View {
                                     HStack {
                                         Spacer()
                                         
-                                        Button(action: { showingImagePicker = true }) {
+                                        Button(action: { showingSourceOptions = true }) {
                                             Image(systemName: "photo.badge.plus")
                                                 .font(.system(size: 18))
                                                 .foregroundColor(.white)
@@ -147,18 +149,38 @@ struct AddStoryView: View {
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
                             
-                            Button(action: { showingImagePicker = true }) {
-                                HStack {
-                                    Image(systemName: "photo.badge.plus")
-                                    Text("Galeriden Seç")
+                            HStack(spacing: 12) {
+                                // Kamera butonu
+                                Button(action: { showingCamera = true }) {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "camera.fill")
+                                            .font(.system(size: 24))
+                                        Text("Kamera")
+                                            .font(.subheadline)
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                    .background(themeManager.currentTheme.primaryColor)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
                                 }
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 32)
-                                .padding(.vertical, 14)
-                                .background(themeManager.currentTheme.primaryColor)
-                                .clipShape(Capsule())
+                                
+                                // Galeri butonu
+                                Button(action: { showingImagePicker = true }) {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: "photo.fill")
+                                            .font(.system(size: 24))
+                                        Text("Galeri")
+                                            .font(.subheadline)
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                    .background(themeManager.currentTheme.secondaryColor)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
                             }
+                            .padding(.horizontal, 40)
                         }
                         
                         Spacer()
@@ -179,6 +201,18 @@ struct AddStoryView: View {
             }
             .sheet(isPresented: $showingImagePicker) {
                 ImagePicker(image: $selectedImage)
+            }
+            .sheet(isPresented: $showingCamera) {
+                CameraPicker(image: $selectedImage)
+            }
+            .confirmationDialog("Fotoğraf Seç", isPresented: $showingSourceOptions) {
+                Button("Kamera") {
+                    showingCamera = true
+                }
+                Button("Galeri") {
+                    showingImagePicker = true
+                }
+                Button("İptal", role: .cancel) { }
             }
             .alert("Hata", isPresented: $showingError) {
                 Button("Tamam", role: .cancel) { }

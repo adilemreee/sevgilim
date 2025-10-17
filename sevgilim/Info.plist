@@ -6,5 +6,9 @@
 	<string>Bu uygulama mevcut konumunuzu kullanarak yer eklemenize yardımcı olur.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Bu uygulama mevcut konumunuzu kullanarak yer eklemenize yardımcı olur.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Story eklemek için kameranızı kullanmak istiyoruz.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Fotoğraf galerinizdeki fotoğrafları story olarak paylaşabilirsiniz.</string>
 </dict>
 </plist>
