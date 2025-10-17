@@ -49,6 +49,11 @@ struct HomeView: View {
                                 animateHearts: $animateHearts
                             )
                             
+                            // Dinamik Selamlama Widget (Sadece belirli saatlerde)
+                            if shouldShowGreeting(for: currentDate) {
+                                GreetingCard(currentDate: currentDate)
+                            }
+                            
                             // Day Counter Card
                             DayCounterCard(
                                 startDate: relationship.startDate,
@@ -198,6 +203,13 @@ struct HomeView: View {
             }
         }
     }
+    
+    // Selamlama widget'ının gösterilip gösterilmeyeceğini kontrol eder
+    private func shouldShowGreeting(for date: Date) -> Bool {
+        let hour = Calendar.current.component(.hour, from: date)
+        // Sadece gece 23:00 - sabah 12:00 arası göster
+        return (hour >= 23 || hour < 12)
+    }
 }
 
 // MARK: - Couple Header
@@ -318,6 +330,72 @@ struct TapHeartView: View {
     }
 }
 
+// MARK: - Greeting Card
+struct GreetingCard: View {
+    let currentDate: Date
+    
+    var greetingMessage: String {
+        let hour = Calendar.current.component(.hour, from: currentDate)
+        // Sabah 7:00 - 12:00: Günaydın
+        // Gece 23:00 - Sabah 7:00: İyi Geceler
+        if hour >= 7 && hour < 12 {
+            return "Günaydın aşkımmmm"
+        } else {
+            return "İyi Geceler sevgilimmmm"
+        }
+    }
+    
+    var greetingIcon: String {
+        let hour = Calendar.current.component(.hour, from: currentDate)
+        if hour >= 7 && hour < 12 {
+            return "sun.max.fill"
+        } else {
+            return "moon.stars.fill"
+        }
+    }
+    
+    var greetingColor: Color {
+        let hour = Calendar.current.component(.hour, from: currentDate)
+        if hour >= 7 && hour < 12 {
+            return .orange
+        } else {
+            return .indigo
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: greetingIcon)
+                .font(.system(size: 24))
+                .foregroundStyle(
+                    greetingColor.gradient
+                )
+                .shadow(color: greetingColor.opacity(0.5), radius: 4)
+            
+            Text(greetingMessage)
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .foregroundColor(.white)
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            LinearGradient(
+                colors: [
+                    greetingColor.opacity(0.3),
+                    greetingColor.opacity(0.15)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .shadow(color: greetingColor.opacity(0.2), radius: 10, x: 0, y: 5)
+    }
+}
+
 // MARK: - Day Counter
 struct DayCounterCard: View {
     let startDate: Date
@@ -329,29 +407,30 @@ struct DayCounterCard: View {
     }
     
     var body: some View {
-        VStack(spacing: 15) {
+        VStack(spacing: 12) {
             Text("Birlikte Geçirdiğimiz Zaman")
-                .font(.headline)
-                .foregroundColor(.white)
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.8))
             
             Text("\(daysSince)")
-                .font(.system(size: 72, weight: .bold, design: .rounded))
+                .font(.system(size: 50, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
             
             Text("GÜN")
-                .font(.title3.bold())
+                .font(.callout.bold())
                 .foregroundColor(.white.opacity(0.8))
             
             Text(currentDate.formattedDifference(from: startDate))
-                .font(.title3)
+                .font(.callout)
                 .foregroundColor(.white.opacity(0.7))
             
             Text("Başlangıç: \(startDate, formatter: DateFormatter.displayFormat)")
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.6))
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.5))
         }
         .frame(maxWidth: .infinity)
-        .padding(30)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 20)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
         .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 5)
     }

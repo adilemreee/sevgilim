@@ -160,13 +160,13 @@ struct SurpriseCardView: View {
             
             // Content
             VStack(spacing: 12) {
-                Text("🎉 Sürpriz Hazır!")
+                Text("🎉 Sürpriz Hazır")
                     .font(.title3)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                     .padding(.top, 16)
                 
-                Text("Dokun ve sürprizi aç!")
+                Text("Dokun ve sürprizi aç")
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.9))
                 
