@@ -12,7 +12,6 @@ import FirebaseStorage
 class MessageService: ObservableObject {
     @Published var messages: [Message] = []
     @Published var partnerIsTyping: Bool = false
-    @Published var unreadCount: Int = 0
     
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
@@ -47,11 +46,6 @@ class MessageService: ObservableObject {
                 
                 // Client-side sorting by timestamp (newest at bottom)
                 self.messages.sort { $0.timestamp < $1.timestamp }
-                
-                // Okunmamış mesaj sayısını hesapla (benim göndermediklerim ve okunmamışlar)
-                self.unreadCount = self.messages.filter { message in
-                    message.senderId != currentUserId && !message.isRead
-                }.count
             }
     }
     

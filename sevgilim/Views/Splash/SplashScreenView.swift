@@ -296,12 +296,16 @@ struct SplashScreenWrapper<Content: View>: View {
     
     var body: some View {
         ZStack {
-            content
-                .opacity(showSplash ? 0 : 1)
+            if !showSplash {
+                content
+                    .transition(.opacity)
+            }
             
             if showSplash {
                 SplashScreenView {
-                    showSplash = false
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        showSplash = false
+                    }
                 }
                 .transition(.opacity)
                 .zIndex(1)

@@ -196,20 +196,22 @@ struct UserAvatarView: View {
     
     var body: some View {
         if let photoURL = photoURL {
-            AsyncImage(url: URL(string: photoURL)) { image in
+            CachedAsyncImage(url: photoURL, thumbnail: true) { image in
                 image
                     .resizable()
                     .scaledToFill()
+                    .frame(width: 68, height: 68)
+                    .clipShape(Circle())
             } placeholder: {
                 Circle()
                     .fill(.gray.opacity(0.3))
+                    .frame(width: 68, height: 68)
                     .overlay {
                         Image(systemName: "person.fill")
                             .foregroundColor(.white)
+                            .font(.system(size: 30))
                     }
             }
-            .frame(width: 68, height: 68)
-            .clipShape(Circle())
         } else {
             Circle()
                 .fill(.gray.opacity(0.3))
