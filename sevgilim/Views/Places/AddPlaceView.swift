@@ -232,6 +232,7 @@ struct AddPlaceView: View {
                     TextField("Yer Adı", text: $placeName)
                     TextField("Adres (isteğe bağlı)", text: $placeAddress)
                     DatePicker("Tarih", selection: $date, displayedComponents: .date)
+                    .environment(\.locale, Locale(identifier: "tr_TR"))
                 }
                 
                 Section("Not") {

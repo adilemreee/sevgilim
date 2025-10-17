@@ -536,6 +536,7 @@ struct AddMemoryView: View {
                     TextEditor(text: $content)
                         .frame(minHeight: 100)
                     DatePicker("Tarih", selection: $date, displayedComponents: .date)
+                    .environment(\.locale, Locale(identifier: "tr_TR"))
                     TextField("Konum (isteğe bağlı)", text: $location)
                 }
                 

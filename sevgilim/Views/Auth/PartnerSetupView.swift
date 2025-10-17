@@ -71,6 +71,7 @@ struct PartnerSetupView: View {
                         DatePicker("", selection: $startDate, displayedComponents: .date)
                             .datePickerStyle(.compact)
                             .labelsHidden()
+                            .environment(\.locale, Locale(identifier: "tr_TR"))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding()
                             .background(Color(.systemBackground))

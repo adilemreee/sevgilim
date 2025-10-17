@@ -125,6 +125,7 @@ struct AddSongView: View {
                     TextField("Şarkı Adı", text: $title)
                     TextField("Sanatçı", text: $artist)
                     DatePicker("Dinleme Tarihi", selection: $date, displayedComponents: .date)
+                    .environment(\.locale, Locale(identifier: "tr_TR"))
                 }
                 
                 Section("Müzik Platform Linkleri") {

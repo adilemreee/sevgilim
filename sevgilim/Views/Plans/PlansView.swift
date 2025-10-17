@@ -288,6 +288,7 @@ struct AddPlanView: View {
                     
                     if hasDate {
                         DatePicker("Tarih", selection: $date, displayedComponents: [.date, .hourAndMinute])
+                        .environment(\.locale, Locale(identifier: "tr_TR"))
                         Toggle("Hatırlatıcı", isOn: $reminderEnabled)
                     }
                 }

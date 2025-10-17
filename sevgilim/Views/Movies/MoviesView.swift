@@ -308,6 +308,7 @@ struct AddMovieView: View {
                 Section("Film Bilgileri") {
                     TextField("Film adı", text: $title)
                     DatePicker("İzlenme tarihi", selection: $watchedDate, displayedComponents: .date)
+                    .environment(\.locale, Locale(identifier: "tr_TR"))
                 }
                 
                 Section("Değerlendirme") {

@@ -728,6 +728,7 @@ struct EditRelationshipView: View {
             Form {
                 Section("İlişki Başlangıç Tarihi") {
                     DatePicker("Tarih", selection: $startDate, displayedComponents: .date)
+                    .environment(\.locale, Locale(identifier: "tr_TR"))
                 }
             }
             .navigationTitle("İlişki Bilgileri")

@@ -107,6 +107,7 @@ struct AddSpecialDayView: View {
                                 DatePicker("", selection: $selectedDate, displayedComponents: .date)
                                     .datePickerStyle(.graphical)
                                     .accentColor(themeManager.currentTheme.primaryColor)
+                                    .environment(\.locale, Locale(identifier: "tr_TR"))
                                     .padding(12)
                                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                             }

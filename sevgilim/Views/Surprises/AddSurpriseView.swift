@@ -156,6 +156,7 @@ struct AddSurpriseView: View {
                                     displayedComponents: [.date, .hourAndMinute]
                                 )
                                 .datePickerStyle(.compact)
+                                .environment(\.locale, Locale(identifier: "tr_TR"))
                                 .labelsHidden()
                                 .padding(12)
                                 .background(Color(.systemBackground))

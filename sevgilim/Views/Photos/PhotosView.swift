@@ -354,6 +354,7 @@ struct AddPhotoView: View {
                     TextField("Başlık (isteğe bağlı)", text: $title)
                     TextField("Konum (isteğe bağlı)", text: $location)
                     DatePicker("Tarih", selection: $date, displayedComponents: .date)
+                    .environment(\.locale, Locale(identifier: "tr_TR"))
                 }
                 
                 Section("Etiketler") {

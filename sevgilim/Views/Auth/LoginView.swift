@@ -39,7 +39,7 @@ struct LoginView: View {
                         .font(.system(size: 42, weight: .bold, design: .rounded))
                         .foregroundColor(themeManager.currentTheme.primaryColor)
                     
-                    Text("Anılarınızı birlikte paylaşın")
+                    Text("Aşkımla bizim uygulmamıza giriş")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
