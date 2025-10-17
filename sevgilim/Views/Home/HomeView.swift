@@ -19,6 +19,7 @@ struct HomeView: View {
     @EnvironmentObject var songService: SongService
     @EnvironmentObject var surpriseService: SurpriseService
     @EnvironmentObject var specialDayService: SpecialDayService
+    @EnvironmentObject var storyService: StoryService
     
     @State private var currentDate = Date()
     @State private var animateHearts = false
@@ -50,6 +51,10 @@ struct HomeView: View {
                                 user2Name: relationship.user2Name,
                                 animateHearts: $animateHearts
                             )
+                            
+                            // Story Circles (Instagram-style)
+                            StoryCircles()
+                                .padding(.horizontal, 20)
                             
                             // Dinamik Selamlama Widget (Sadece belirli saatlerde)
                             if shouldShowGreeting(for: currentDate) {

@@ -17,6 +17,7 @@ struct MainTabView: View {
     @EnvironmentObject var movieService: MovieService
     @EnvironmentObject var placeService: PlaceService
     @EnvironmentObject var songService: SongService
+    @EnvironmentObject var storyService: StoryService
     
     @State private var selectedTab = 0
     
@@ -75,6 +76,7 @@ struct MainTabView: View {
                 movieService.listenToMovies(relationshipId: relationshipId)
                 placeService.listenToPlaces(relationshipId: relationshipId)
                 songService.listenToSongs(relationshipId: relationshipId)
+                storyService.listenToStories(relationshipId: relationshipId, currentUserId: userId)
             }
         }
     }
