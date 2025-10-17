@@ -5,20 +5,19 @@
 
 import SwiftUI
 
-enum StorySource {
-    case user
-    case partner
-}
-
 struct StoryCircles: View {
     @EnvironmentObject var storyService: StoryService
     @EnvironmentObject var authService: AuthenticationService
     @EnvironmentObject var themeManager: ThemeManager
     
-    @State private var showingStoryViewer = false
+    @State private var storyPresentation: StoryPresentation?
     @State private var showingAddStory = false
-    @State private var selectedSource: StorySource = .user
-    @State private var startIndex: Int = 0
+    
+    struct StoryPresentation: Identifiable {
+        let id = UUID()
+        let stories: [Story]
+        let startIndex: Int
+    }
     
     // İlk izlenmemiş story'nin index'ini bul
     private func getStartIndex(for stories: [Story], userId: String) -> Int {
@@ -94,9 +93,9 @@ struct StoryCircles: View {
                         }
                         .onTapGesture {
                             if !storyService.userStories.isEmpty, let userId = authService.currentUser?.id {
-                                selectedSource = .user
-                                startIndex = getStartIndex(for: storyService.userStories, userId: userId)
-                                showingStoryViewer = true
+                                let stories = storyService.userStories
+                                let index = getStartIndex(for: stories, userId: userId)
+                                storyPresentation = StoryPresentation(stories: stories, startIndex: index)
                             } else {
                                 showingAddStory = true
                             }
@@ -152,9 +151,9 @@ struct StoryCircles: View {
                         }
                         .onTapGesture {
                             if let userId = authService.currentUser?.id {
-                                selectedSource = .partner
-                                startIndex = getStartIndex(for: storyService.partnerStories, userId: userId)
-                                showingStoryViewer = true
+                                let stories = storyService.partnerStories
+                                let index = getStartIndex(for: stories, userId: userId)
+                                storyPresentation = StoryPresentation(stories: stories, startIndex: index)
                             }
                         }
                         
@@ -172,14 +171,11 @@ struct StoryCircles: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-        .fullScreenCover(isPresented: $showingStoryViewer) {
-            let stories = selectedSource == .user ? storyService.userStories : storyService.partnerStories
-            if !stories.isEmpty {
-                StoryViewer(stories: stories, startIndex: startIndex)
-                    .environmentObject(storyService)
-                    .environmentObject(authService)
-                    .environmentObject(themeManager)
-            }
+        .fullScreenCover(item: $storyPresentation) { presentation in
+            StoryViewer(stories: presentation.stories, startIndex: presentation.startIndex)
+                .environmentObject(storyService)
+                .environmentObject(authService)
+                .environmentObject(themeManager)
         }
         .sheet(isPresented: $showingAddStory) {
             AddStoryView()

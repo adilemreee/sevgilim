@@ -205,17 +205,18 @@ struct StoryViewer: View {
                         // Alt Bar - Instagram tarzı
                         if story.createdBy != authService.currentUser?.id {
                             HStack(spacing: 12) {
-                                // Mesaj Input
+                                // Mesaj Input (Devre dışı)
                                 HStack {
                                     Text("Mesaj gönder")
-                                        .foregroundColor(.white.opacity(0.6))
+                                        .foregroundColor(.white.opacity(0.4))
                                         .font(.system(size: 15))
                                     Spacer()
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
-                                .background(.ultraThinMaterial)
+                                .background(.ultraThinMaterial.opacity(0.5))
                                 .cornerRadius(25)
+                                .allowsHitTesting(false)
                                 
                                 // Beğeni Butonu
                                 Button(action: {
@@ -226,14 +227,10 @@ struct StoryViewer: View {
                                         .foregroundColor(story.isLikedBy(userId: authService.currentUser?.id ?? "") ? .red : .white)
                                 }
                                 
-                                // Paylaş Butonu
-                                Button(action: {
-                                    // Paylaş fonksiyonu eklenebilir
-                                }) {
-                                    Image(systemName: "paperplane")
-                                        .font(.system(size: 26, weight: .regular))
-                                        .foregroundColor(.white)
-                                }
+                                // Paylaş Butonu (Devre dışı)
+                                Image(systemName: "paperplane")
+                                    .font(.system(size: 26, weight: .regular))
+                                    .foregroundColor(.white.opacity(0.4))
                             }
                             .padding(.horizontal, 16)
                             .padding(.bottom, 40)
