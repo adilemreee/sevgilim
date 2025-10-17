@@ -24,6 +24,7 @@ struct HomeView: View {
     @EnvironmentObject var specialDayService: SpecialDayService
     @EnvironmentObject var storyService: StoryService
     @EnvironmentObject var messageService: MessageService
+    @EnvironmentObject var greetingService: GreetingService
     
     // MARK: - State
     @State private var currentDate = Date()
@@ -65,8 +66,8 @@ struct HomeView: View {
                                 .padding(.horizontal, 20)
                             
                             // Dynamic Greeting (time-based)
-                            if shouldShowGreeting(for: currentDate) {
-                                GreetingCard(currentDate: currentDate)
+                            if greetingService.shouldShowGreeting {
+                                GreetingCard()
                             }
                             
                             // Day Counter
@@ -188,12 +189,6 @@ struct HomeView: View {
     }
     
     // MARK: - Private Methods
-    
-    /// Shows greeting card only during specific hours (23:00-12:00)
-    private func shouldShowGreeting(for date: Date) -> Bool {
-        let hour = Calendar.current.component(.hour, from: date)
-        return (hour >= 23 || hour < 12)
-    }
     
     /// Navigate to a destination with delay (for menu dismissal animation)
     private func navigateWithDelay(to binding: Binding<Bool>) {

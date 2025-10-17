@@ -8,47 +8,22 @@
 import SwiftUI
 
 struct GreetingCard: View {
-    let currentDate: Date
-    
-    var greetingMessage: String {
-        let hour = Calendar.current.component(.hour, from: currentDate)
-        // Sabah 7:00 - 12:00: Günaydın
-        // Gece 23:00 - Sabah 7:00: İyi Geceler
-        if hour >= 7 && hour < 12 {
-            return "Günaydın aşkımmmm"
-        } else {
-            return "İyi Geceler sevgilimmmm"
-        }
-    }
-    
-    var greetingIcon: String {
-        let hour = Calendar.current.component(.hour, from: currentDate)
-        if hour >= 7 && hour < 12 {
-            return "sun.max.fill"
-        } else {
-            return "moon.stars.fill"
-        }
-    }
+    @EnvironmentObject var greetingService: GreetingService
     
     var greetingColor: Color {
-        let hour = Calendar.current.component(.hour, from: currentDate)
-        if hour >= 7 && hour < 12 {
-            return .orange
-        } else {
-            return .indigo
-        }
+        return greetingService.currentIcon == "sun.max.fill" ? .orange : .indigo
     }
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: greetingIcon)
+            Image(systemName: greetingService.currentIcon)
                 .font(.system(size: 24))
                 .foregroundStyle(
                     greetingColor.gradient
                 )
                 .shadow(color: greetingColor.opacity(0.5), radius: 4)
             
-            Text(greetingMessage)
+            Text(greetingService.currentGreeting)
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .foregroundColor(.white)
             

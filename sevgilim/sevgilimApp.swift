@@ -25,6 +25,7 @@ struct sevgilimApp: App {
     @StateObject private var storyService = StoryService()
     @StateObject private var messageService = MessageService()
     @StateObject private var themeManager = ThemeManager()
+    @StateObject private var greetingService = GreetingService()
     
     
     var body: some Scene {
@@ -45,6 +46,7 @@ struct sevgilimApp: App {
                 .environmentObject(storyService)
                 .environmentObject(messageService)
                 .environmentObject(themeManager)
+                .environmentObject(greetingService)
                 
         }
     }
