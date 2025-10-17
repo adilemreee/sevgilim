@@ -34,6 +34,7 @@ struct HomeView: View {
     @State private var navigateToSongs = false
     @State private var navigateToSurprises = false
     @State private var navigateToSpecialDays = false
+    @State private var unreadBadgeCount = 0
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     
     var body: some View {
@@ -139,8 +140,8 @@ struct HomeView: View {
                             .foregroundColor(.white)
                     }
                     .buttonStyle(.plain)
-                    .if(messageService.unreadCount > 0) { view in
-                        view.badge(messageService.unreadCount)
+                    .if(unreadBadgeCount > 0) { view in
+                        view.badge(unreadBadgeCount)
                     }
                 }
             }
@@ -227,12 +228,18 @@ struct HomeView: View {
             .onReceive(timer) { _ in
                 currentDate = Date()
             }
+            .onChange(of: messageService.unreadCount) { oldValue, newValue in
+                unreadBadgeCount = newValue
+            }
             .task {
                 // Use task for better lifecycle management
                 if let relationshipId = authService.currentUser?.relationshipId {
                     relationshipService.listenToRelationship(relationshipId: relationshipId)
                     specialDayService.listenToSpecialDays(relationshipId: relationshipId)
                 }
+                
+                // Initialize badge count
+                unreadBadgeCount = messageService.unreadCount
                 
                 // Start heart animation
                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
