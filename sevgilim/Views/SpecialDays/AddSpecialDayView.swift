@@ -19,83 +19,124 @@ struct AddSpecialDayView: View {
     @State private var isSaving = false
     
     var body: some View {
-        NavigationStack {
+        NavigationView {
             ZStack {
-                // Background
-                AnimatedGradientBackground(theme: themeManager.currentTheme)
-                    .ignoresSafeArea()
+                // Background - Same as SpecialDaysView
+                LinearGradient(
+                    colors: [
+                        themeManager.currentTheme.primaryColor.opacity(0.3),
+                        themeManager.currentTheme.secondaryColor.opacity(0.2)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 24) {
-                        // Başlık
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Başlık")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.8))
+                    VStack(spacing: 20) {
+                        // Header
+                        HStack(spacing: 12) {
+                            Image(systemName: "calendar.badge.plus")
+                                .font(.system(size: 24))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.pink, .purple],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
                             
-                            TextField("Örn: İlk Buluşmamız", text: $title)
-                                .textFieldStyle(ModernTextFieldStyle())
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Yeni Özel Gün")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                
+                                Text("Önemli bir gün ekleyin")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
                         
-                        // Kategori
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Kategori")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.8))
+                        // Form Fields
+                        VStack(spacing: 16) {
+                            // Başlık
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("Başlık", systemImage: "text.cursor")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                
+                                TextField("Örn: aşkımla pizza date skdmfksmdfk", text: $title)
+                                    .padding(12)
+                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                            }
                             
-                            Picker("Kategori", selection: $selectedCategory) {
-                                ForEach(SpecialDayCategory.allCases, id: \.self) { category in
-                                    HStack {
-                                        Image(systemName: category.icon)
-                                        Text(category.rawValue)
+                            // Kategori
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("Kategori", systemImage: "tag")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                
+                                Picker("Kategori", selection: $selectedCategory) {
+                                    ForEach(SpecialDayCategory.allCases, id: \.self) { category in
+                                        HStack {
+                                            Image(systemName: category.icon)
+                                            Text(category.rawValue)
+                                        }
+                                        .tag(category)
                                     }
-                                    .tag(category)
+                                }
+                                .pickerStyle(.menu)
+                                .padding(12)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                                .accentColor(themeManager.currentTheme.primaryColor)
+                            }
+                            
+                            // Tarih
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("Tarih", systemImage: "calendar")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                
+                                DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                                    .datePickerStyle(.graphical)
+                                    .accentColor(themeManager.currentTheme.primaryColor)
+                                    .padding(12)
+                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                            }
+                            
+                            // Her yıl tekrarla
+                            Toggle(isOn: $isRecurring) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .foregroundColor(themeManager.currentTheme.primaryColor)
+                                    Text("Her yıl tekrarla")
                                 }
                             }
-                            .pickerStyle(.menu)
-                            .padding()
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                            .accentColor(themeManager.currentTheme.primaryColor)
-                        }
-                        
-                        // Tarih
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Tarih")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.8))
+                            .padding(12)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                             
-                            DatePicker("", selection: $selectedDate, displayedComponents: .date)
-                                .datePickerStyle(.graphical)
-                                .accentColor(themeManager.currentTheme.primaryColor)
-                                .padding()
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                        }
-                        
-                        // Her yıl tekrarla
-                        Toggle(isOn: $isRecurring) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "arrow.clockwise")
-                                    .foregroundColor(themeManager.currentTheme.primaryColor)
-                                Text("Her yıl tekrarla")
-                                    .foregroundColor(.white)
+                            // Notlar
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("Notlar (Opsiyonel)", systemImage: "note.text")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                
+                                TextEditor(text: $notes)
+                                    .frame(height: 100)
+                                    .scrollContentBackground(.hidden)
+                                    .padding(12)
+                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                             }
                         }
-                        .padding()
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                        
-                        // Notlar
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Notlar (Opsiyonel)")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.8))
-                            
-                            TextEditor(text: $notes)
-                                .frame(height: 100)
-                                .scrollContentBackground(.hidden)
-                                .padding(12)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                                .foregroundColor(.white)
-                        }
+                        .padding(.horizontal, 20)
                         
                         // Kaydet Butonu
                         Button(action: saveSpecialDay) {
@@ -111,27 +152,31 @@ struct AddSpecialDayView: View {
                             .frame(maxWidth: .infinity)
                             .font(.headline)
                             .foregroundColor(.white)
-                            .padding(.vertical, 16)
+                            .padding(.vertical, 14)
                             .background(themeManager.currentTheme.primaryColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .disabled(title.isEmpty || isSaving)
                         .opacity(title.isEmpty ? 0.5 : 1.0)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
                     }
-                    .padding(20)
+                    .padding(.bottom, 20)
                 }
             }
-            .navigationTitle("Yeni Özel Gün")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("İptal") {
-                        dismiss()
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("Geri")
+                        }
+                        .foregroundColor(themeManager.currentTheme.primaryColor)
                     }
-                    .foregroundColor(.white)
                 }
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
     
     private func saveSpecialDay() {
