@@ -34,6 +34,15 @@ struct StoryViewer: View {
     
     var currentStory: Story? {
         guard currentIndex < stories.count else { return nil }
+        let storyId = stories[currentIndex].id
+        
+        // StoryService'ten güncel story'yi al (beğeni güncellemeleri için)
+        let allStories = storyService.userStories + storyService.partnerStories
+        if let updatedStory = allStories.first(where: { $0.id == storyId }) {
+            return updatedStory
+        }
+        
+        // Bulunamazsa orijinal story'yi döndür
         return stories[currentIndex]
     }
     
