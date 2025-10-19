@@ -16,6 +16,7 @@ struct HamburgerMenuView: View {
     @EnvironmentObject var songService: SongService
     @EnvironmentObject var surpriseService: SurpriseService
     @EnvironmentObject var specialDayService: SpecialDayService
+    @EnvironmentObject var messageService: MessageService
     
     let onPlansSelected: () -> Void
     let onMoviesSelected: () -> Void
@@ -58,6 +59,7 @@ struct HamburgerMenuView: View {
                 MinimalMenuButton(
                     icon: "message.fill",
                     title: "Sohbet",
+                    count: messageService.unreadMessageCount,
                     theme: themeManager.currentTheme,
                     action: onChatSelected
                 )

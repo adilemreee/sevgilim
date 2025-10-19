@@ -70,6 +70,21 @@ struct HomeView: View {
                                 GreetingCard()
                             }
                             
+                            // Partner Surprise
+                            if let currentUser = authService.currentUser,
+                               let userId = currentUser.id,
+                               let surprise = surpriseService.nextUpcomingSurpriseForUser(userId: userId) {
+                                PartnerSurpriseHomeCard(
+                                    surprise: surprise,
+                                    onTap: { navigateToSurprises = true },
+                                    onOpen: {
+                                        Task {
+                                            try? await surpriseService.markAsOpened(surprise)
+                                        }
+                                    }
+                                )
+                            }
+                            
                             // Day Counter
                             DayCounterCard(
                                 startDate: relationship.startDate,
@@ -109,20 +124,6 @@ struct HomeView: View {
                                 )
                             }
                             
-                            // Partner Surprise
-                            if let currentUser = authService.currentUser,
-                               let userId = currentUser.id,
-                               let surprise = surpriseService.nextUpcomingSurpriseForUser(userId: userId) {
-                                PartnerSurpriseHomeCard(
-                                    surprise: surprise,
-                                    onTap: { navigateToSurprises = true },
-                                    onOpen: {
-                                        Task {
-                                            try? await surpriseService.markAsOpened(surprise)
-                                        }
-                                    }
-                                )
-                            }
                         }
                     }
                     .padding(.horizontal, 20)
@@ -173,6 +174,7 @@ struct HomeView: View {
                 .environmentObject(songService)
                 .environmentObject(surpriseService)
                 .environmentObject(specialDayService)
+                .environmentObject(messageService)
                 .presentationDetents([.height(600)])
                 .presentationDragIndicator(.visible)
             }
@@ -200,10 +202,12 @@ struct HomeView: View {
     
     /// Setup Firebase listeners
     private func setupServices() {
-        guard let relationshipId = authService.currentUser?.relationshipId else { return }
+        guard let relationshipId = authService.currentUser?.relationshipId,
+              let userId = authService.currentUser?.id else { return } // <-- userId'yi de alın
         
         relationshipService.listenToRelationship(relationshipId: relationshipId)
         specialDayService.listenToSpecialDays(relationshipId: relationshipId)
+        messageService.listenToUnreadMessagesCount(relationshipId: relationshipId, currentUserId: userId)
     }
     
     /// Start UI animations

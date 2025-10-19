@@ -12,15 +12,17 @@ import FirebaseStorage
 class MessageService: ObservableObject {
     @Published var messages: [Message] = []
     @Published var partnerIsTyping: Bool = false
+    @Published var unreadMessageCount: Int = 0
     
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     private var messagesListener: ListenerRegistration?
     private var typingListener: ListenerRegistration?
+    private var unreadCountListener: ListenerRegistration?
     private var typingTimer: Timer?
     
     // MARK: - Listen to Messages (Optimized)
-    func listenToMessages(relationshipId: String, currentUserId: String) {
+    func listenToMessages(relationshipId: String , currentUserId : String) {
         // Remove existing listener if any
         messagesListener?.remove()
         
@@ -184,6 +186,33 @@ class MessageService: ObservableObject {
         }
     }
     
+    // MARK: - Listen to Unread Messages Count (YENİ FONKSİYON)
+    func listenToUnreadMessagesCount(relationshipId: String, currentUserId: String) {
+        // Mevcut dinleyiciyi kaldır
+        unreadCountListener?.remove()
+
+        // Sadece karşı tarafın gönderdiği ve okunmamış mesajları dinle
+        unreadCountListener = db.collection("messages")
+            .whereField("relationshipId", isEqualTo: relationshipId)
+            .whereField("isRead", isEqualTo: false)
+            .whereField("senderId", isNotEqualTo: currentUserId) // <-- ÖNEMLİ: Kendi mesajlarımızı saymamak için
+            .addSnapshotListener { [weak self] snapshot, error in
+                if let error = error {
+                    print("❌ Error listening to unread message count: \(error.localizedDescription)")
+                    return
+                }
+
+                guard let count = snapshot?.documents.count else {
+                    self?.unreadMessageCount = 0
+                    return
+                }
+
+                print(" okunmamış mesaj sayısı: \(count)")
+                self?.unreadMessageCount = count
+            }
+    }
+    
+    
     // MARK: - Start Typing
     func startTyping(relationshipId: String, userId: String, userName: String) {
         Task {
@@ -212,6 +241,7 @@ class MessageService: ObservableObject {
         print("🧹 Cleaning up MessageService")
         messagesListener?.remove()
         typingListener?.remove()
+        unreadCountListener?.remove()
         typingTimer?.invalidate()
     }
     
@@ -219,6 +249,7 @@ class MessageService: ObservableObject {
         // Cancel listeners synchronously (safe in deinit)
         messagesListener?.remove()
         typingListener?.remove()
+        unreadCountListener?.remove()
         typingTimer?.invalidate()
     }
 }
