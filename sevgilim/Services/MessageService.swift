@@ -8,6 +8,7 @@ import Combine
 import FirebaseFirestore
 import FirebaseStorage
 
+
 @MainActor
 class MessageService: ObservableObject {
     @Published var messages: [Message] = []

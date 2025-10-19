@@ -138,12 +138,14 @@ struct HomeView: View {
                     } label: {
                         Image(systemName: "line.3.horizontal")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.white)
+//                            .foregroundColor(.white)
+                            .foregroundStyle(.white)
                     }
-                    .buttonStyle(.plain)
+                        .buttonStyle(.plain)
+//                    .glassEffect()
                 }
             }
-            .toolbarBackground(.hidden, for: .navigationBar)
+           .toolbarBackground(.hidden, for: .navigationBar)
             
             // Navigation Destinations
             .navigationDestination(isPresented: $navigateToPlans) { PlansView() }

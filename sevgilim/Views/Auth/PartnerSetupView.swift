@@ -57,7 +57,7 @@ struct PartnerSetupView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
-                        TextField("partner@email.com", text: $partnerEmail)
+                        TextField("aşkımınnn_maili@email.com", text: $partnerEmail)
                             .textFieldStyle(CustomTextFieldStyle())
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
@@ -135,7 +135,7 @@ struct PartnerSetupView: View {
     
     private func sendInvitation() {
         guard !partnerEmail.isEmpty else {
-            errorMessage = "Lütfen partner e-posta adresini girin"
+            errorMessage = "Lütfen aşkının e-posta adresini girin"
             showError = true
             return
         }
@@ -161,7 +161,7 @@ struct PartnerSetupView: View {
                 await MainActor.run {
                     partnerEmail = ""
                     isLoading = false
-                    errorMessage = "Davet gönderildi! Partnerinizin kabul etmesini bekleyin."
+                    errorMessage = "Davet gönderildi! aşkınızın kabul etmesini bekleyin."
                     showError = true
                 }
             } catch {

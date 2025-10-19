@@ -35,7 +35,7 @@ struct LoginView: View {
                         .font(.system(size: 80))
                         .foregroundStyle(themeManager.currentTheme.primaryColor)
                     
-                    Text("Sevgilim")
+                    Text("Sevgilimmm")
                         .font(.system(size: 42, weight: .bold, design: .rounded))
                         .foregroundColor(themeManager.currentTheme.primaryColor)
                     
