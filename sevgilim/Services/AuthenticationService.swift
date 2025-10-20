@@ -105,7 +105,7 @@ class AuthenticationService: ObservableObject {
         guard let userId = currentUser?.id else { return }
         
         var updates: [String: Any] = [:]
-        if let name = name {
+        if let name = name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             updates["name"] = name
         }
         if let profileImageURL = profileImageURL {
@@ -113,6 +113,28 @@ class AuthenticationService: ObservableObject {
         }
         
         try await db.collection("users").document(userId).updateData(updates)
+        
+        if let relationshipId = currentUser?.relationshipId,
+           let name = name,
+           !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let relationshipRef = db.collection("relationships").document(relationshipId)
+            let snapshot = try await relationshipRef.getDocument()
+            if snapshot.exists {
+                var relationshipUpdates: [String: Any] = [:]
+                let data = snapshot.data() ?? [:]
+                if let user1Id = data["user1Id"] as? String, user1Id == userId {
+                    relationshipUpdates["user1Name"] = name
+                }
+                if let user2Id = data["user2Id"] as? String, user2Id == userId {
+                    relationshipUpdates["user2Name"] = name
+                }
+                
+                if !relationshipUpdates.isEmpty {
+                    try await relationshipRef.updateData(relationshipUpdates)
+                }
+            }
+        }
+        
         fetchUserData(userId: userId)
     }
     
@@ -126,4 +148,3 @@ class AuthenticationService: ObservableObject {
         fetchUserData(userId: userId)
     }
 }
-

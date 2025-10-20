@@ -24,7 +24,7 @@ struct NotificationsView: View {
     @AppStorage("storyNotificationsClearedAt") private var storyNotificationsClearedTimestamp: Double = 0
     
     private enum NotificationTab: String, CaseIterable, Identifiable {
-        case partnerActivity = "Partner Hareketleri"
+        case partnerActivity = "Aşkınınn Hareketleri"
         case storyInteractions = "Story Bildirimleri"
         
         var id: String { rawValue }
@@ -75,7 +75,7 @@ struct NotificationsView: View {
                             EmptyNotificationState(
                                 systemImage: "square.and.pencil.circle",
                                 title: "Şimdilik Bildirim Yok",
-                                message: "Partneriniz bir şeyler eklediğinde burada göreceksiniz."
+                                message: "aşkınıızzz bir şeyler eklemedi...."
                             )
                         } else {
                             ForEach(partnerActivityItems) { item in
@@ -87,7 +87,7 @@ struct NotificationsView: View {
                             EmptyNotificationState(
                                 systemImage: "sparkles.rectangle.stack",
                                 title: "Story Etkileşimi Yok",
-                                message: "Story beğenileri ve yanıtları burada topluyoruz."
+                                message: "Story beğenileri ve yanıtlarıı..."
                             )
                         } else {
                             ForEach(storyInteractionItems) { item in
