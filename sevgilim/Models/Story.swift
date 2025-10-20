@@ -17,6 +17,7 @@ struct Story: Identifiable, Codable {
     let createdAt: Date
     var viewedBy: [String] // userId array
     var likedBy: [String]? // userId array - kim beğendi (optional - eski story'ler için)
+    var likeTimestamps: [String: Date] // userId -> beğeni zamanı
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -29,6 +30,7 @@ struct Story: Identifiable, Codable {
         case createdAt
         case viewedBy
         case likedBy
+        case likeTimestamps
     }
     
     // Codable init - likedBy yoksa boş array yap
@@ -44,10 +46,11 @@ struct Story: Identifiable, Codable {
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         viewedBy = try container.decode([String].self, forKey: .viewedBy)
         likedBy = try container.decodeIfPresent([String].self, forKey: .likedBy) ?? []
+        likeTimestamps = try container.decodeIfPresent([String: Date].self, forKey: .likeTimestamps) ?? [:]
     }
     
     // Normal init
-    init(photoURL: String, thumbnailURL: String?, createdBy: String, createdByName: String, createdByPhotoURL: String?, relationshipId: String, createdAt: Date, viewedBy: [String], likedBy: [String]?) {
+    init(photoURL: String, thumbnailURL: String?, createdBy: String, createdByName: String, createdByPhotoURL: String?, relationshipId: String, createdAt: Date, viewedBy: [String], likedBy: [String]?, likeTimestamps: [String: Date] = [:]) {
         self.photoURL = photoURL
         self.thumbnailURL = thumbnailURL
         self.createdBy = createdBy
@@ -57,6 +60,7 @@ struct Story: Identifiable, Codable {
         self.createdAt = createdAt
         self.viewedBy = viewedBy
         self.likedBy = likedBy ?? []
+        self.likeTimestamps = likeTimestamps
     }
     
     // 24 saat geçti mi?
@@ -108,5 +112,9 @@ struct Story: Identifiable, Codable {
     // Bu user story'yi beğendi mi?
     func isLikedBy(userId: String) -> Bool {
         return likedBy?.contains(userId) ?? false
+    }
+    
+    func likeTimestamp(for userId: String) -> Date? {
+        return likeTimestamps[userId]
     }
 }

@@ -31,6 +31,7 @@ struct HomeView: View {
     @State private var navigateToSongs = false
     @State private var navigateToSurprises = false
     @State private var navigateToSpecialDays = false
+    @State private var showingNotifications = false
     
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     
@@ -123,6 +124,16 @@ struct HomeView: View {
                 }
             }
             .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            showingNotifications = true
+                        } label: {
+                            Image(systemName: "bell")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button {
                             showingMenu = true
@@ -162,6 +173,11 @@ struct HomeView: View {
                 )
                 .presentationDetents([.height(600)])
                 .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showingNotifications) {
+                NotificationsView()
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
             }
             
             // Timer & Lifecycle

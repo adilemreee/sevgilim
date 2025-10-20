@@ -88,7 +88,8 @@ class StoryService: ObservableObject {
             relationshipId: relationshipId,
             createdAt: Date(),
             viewedBy: [userId], // Oluşturan kişi otomatik görülmüş sayılır
-            likedBy: [] // Başlangıçta beğeni yok
+            likedBy: [], // Başlangıçta beğeni yok
+            likeTimestamps: [:]
         )
         
         // Firestore'a kaydet
@@ -225,20 +226,31 @@ class StoryService: ObservableObject {
         
         // likedBy'ı initialize et (eski story'ler için)
         var currentLikedBy = story.likedBy ?? []
+        var currentLikeTimestamps = story.likeTimestamps
         
         // Beğeni durumunu değiştir
         if currentLikedBy.contains(userId) {
             // Beğeniyi kaldır
             currentLikedBy.removeAll { $0 == userId }
+            currentLikeTimestamps[userId] = nil
         } else {
             // Beğen
             currentLikedBy.append(userId)
+            currentLikeTimestamps[userId] = Date()
         }
         
         // Firestore'u güncelle
-        try await storyRef.updateData([
+        var updateData: [String: Any] = [
             "likedBy": currentLikedBy
-        ])
+        ]
+        
+        if currentLikeTimestamps.isEmpty {
+            updateData["likeTimestamps"] = FieldValue.delete()
+        } else {
+            updateData["likeTimestamps"] = currentLikeTimestamps
+        }
+        
+        try await storyRef.updateData(updateData)
     }
     
     // Listener'ı durdur
