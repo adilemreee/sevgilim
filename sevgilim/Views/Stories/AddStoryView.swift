@@ -200,8 +200,13 @@ struct AddStoryView: View {
             .sheet(isPresented: $showingImagePicker) {
                 ImagePicker(image: $selectedImage)
             }
-            .sheet(isPresented: $showingCamera) {
-                CameraPicker(image: $selectedImage)
+            .fullScreenCover(isPresented: $showingCamera) {
+                ZStack {
+                    Color.black
+                        .ignoresSafeArea()
+                    CameraPicker(image: $selectedImage)
+                        .ignoresSafeArea()
+                }
             }
             .confirmationDialog("Fotoğraf Seç", isPresented: $showingSourceOptions) {
                 Button("Kamera") {

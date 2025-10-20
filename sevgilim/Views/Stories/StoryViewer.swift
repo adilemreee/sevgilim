@@ -335,17 +335,14 @@ struct StoryViewer: View {
             }
         }
         .onAppear {
-            loadCurrentStory()
-            startTimer()
+            prepareForCurrentStory()
             markAsViewed()
         }
         .onDisappear {
             stopTimer()
         }
         .onChange(of: currentIndex) { _, _ in
-            loadCurrentStory()
-            progress = 0
-            startTimer()
+            prepareForCurrentStory()
             markAsViewed()
         }
         .alert("Story'yi Sil", isPresented: $showingDeleteAlert) {
@@ -397,6 +394,14 @@ struct StoryViewer: View {
         .statusBar(hidden: true)
     }
     
+    // MARK: - Preparation
+    private func prepareForCurrentStory() {
+        stopTimer()
+        isPaused = false
+        progress = 0
+        loadCurrentStory()
+    }
+    
     // MARK: - Progress Width
     private func progressWidth(for index: Int, geometry: GeometryProxy) -> CGFloat {
         if index < currentIndex {
@@ -445,6 +450,7 @@ struct StoryViewer: View {
     
     // MARK: - Timer Functions
     private func startTimer() {
+        guard !isLoading else { return }
         stopTimer()
         timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
             if !isPaused {
@@ -490,23 +496,31 @@ struct StoryViewer: View {
     // MARK: - Load Story
     private func loadCurrentStory() {
         guard let story = currentStory else {
+            cachedImage = nil
+            isLoading = false
             return
         }
         
         isLoading = true
         cachedImage = nil
+        let targetStoryId = story.id
         
         Task {
             do {
                 let image = try await ImageCacheService.shared.loadImage(from: story.photoURL, thumbnail: false)
                 await MainActor.run {
+                    guard targetStoryId == currentStory?.id else { return }
                     cachedImage = image
                     isLoading = false
+                    startTimer()
                 }
             } catch {
                 print("❌ Story resmi yüklenemedi: \(error.localizedDescription)")
                 await MainActor.run {
+                    guard targetStoryId == currentStory?.id else { return }
+                    cachedImage = nil
                     isLoading = false
+                    startTimer()
                 }
             }
         }

@@ -21,83 +21,50 @@ struct StoryCircles: View {
     
     // İlk izlenmemiş story'nin index'ini bul
     private func getStartIndex(for stories: [Story], userId: String) -> Int {
-        // İlk izlenmemiş story'yi bul
         if let firstUnviewed = stories.firstIndex(where: { !$0.isViewedBy(userId: userId) }) {
             return firstUnviewed
         }
-        // Hepsi izlenmişse baştan başla
         return 0
     }
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
-                // User's Story Circle
-                if let currentUser = authService.currentUser {
+            HStack(spacing: 18) {
+                if let currentUser = authService.currentUser,
+                   let userId = currentUser.id {
+                    let userStories = storyService.userStories
+                    let hasStories = !userStories.isEmpty
+                    let allViewed = hasStories ? userStories.allSatisfy { $0.isViewedBy(userId: userId) } : true
+                    let userActiveColors: [Color] = [
+                        themeManager.currentTheme.primaryColor,
+                        themeManager.currentTheme.secondaryColor,
+                        .pink,
+                        .purple
+                    ]
+                    let mutedColors: [Color] = [
+                        Color.white.opacity(0.25),
+                        Color.white.opacity(0.1)
+                    ]
+                    
                     VStack(spacing: 8) {
-                        ZStack {
-                            // Circle with gradient border
-                            if !storyService.userStories.isEmpty {
-                                // Has stories - show with gradient border
-                                let allViewed = storyService.userStories.allSatisfy { $0.isViewedBy(userId: currentUser.id ?? "") }
-                                
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: allViewed ?
-                                                [.gray.opacity(0.5), .gray.opacity(0.3)] :
-                                                [themeManager.currentTheme.primaryColor, themeManager.currentTheme.secondaryColor],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .frame(width: 74, height: 74)
-                                    .shimmer(isActive: !allViewed)
-                                    .pulse(isActive: !allViewed)
-                                
-                                // Avatar
-                                UserAvatarView(photoURL: currentUser.profileImageURL)
-                                
-                                // Story count badge
-                                if storyService.userStories.count > 1 {
-                                    Text("\(storyService.userStories.count)")
-                                        .font(.caption2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.white)
-                                        .frame(width: 22, height: 22)
-                                        .background(themeManager.currentTheme.primaryColor)
-                                        .clipShape(Circle())
-                                        .overlay {
-                                            Circle()
-                                                .stroke(.white, lineWidth: 2)
-                                        }
-                                        .offset(x: 25, y: -25)
-                                }
-                            } else {
-                                // No story - show add button
-                                Circle()
-                                    .fill(.gray.opacity(0.2))
-                                    .frame(width: 74, height: 74)
-                                
-                                UserAvatarView(photoURL: currentUser.profileImageURL)
-                                
-                                // Plus button
-                                Circle()
-                                    .fill(themeManager.currentTheme.primaryColor)
-                                    .frame(width: 24, height: 24)
-                                    .overlay {
-                                        Image(systemName: "plus")
-                                            .font(.system(size: 12, weight: .bold))
-                                            .foregroundColor(.white)
-                                    }
-                                    .offset(x: 25, y: 25)
-                            }
-                        }
+                        StoryRing(
+                            size: 78,
+                            imageURL: nil,
+                            fallbackURL: currentUser.profileImageURL,
+                            placeholderSystemImage: "person.fill",
+                            gradientColors: hasStories ? userActiveColors : mutedColors,
+                            isDimmed: allViewed || !hasStories,
+                            badgeCount: (hasStories && !allViewed)
+                                ? userStories.filter { !$0.isViewedBy(userId: userId) }.count
+                                : nil,
+                            plusColor: themeManager.currentTheme.primaryColor,
+                            showUnreadIndicator: false,
+                            unreadGradientColors: []
+                        )
                         .onTapGesture {
-                            if !storyService.userStories.isEmpty, let userId = authService.currentUser?.id {
-                                let stories = storyService.userStories
-                                let index = getStartIndex(for: stories, userId: userId)
-                                storyPresentation = StoryPresentation(stories: stories, startIndex: index)
+                            if hasStories {
+                                let index = getStartIndex(for: userStories, userId: userId)
+                                storyPresentation = StoryPresentation(stories: userStories, startIndex: index)
                             } else {
                                 showingAddStory = true
                             }
@@ -108,72 +75,56 @@ struct StoryCircles: View {
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
-                    .frame(width: 74)
                 }
                 
-                // Partner's Story Circle
-                if !storyService.partnerStories.isEmpty,
-                   let currentUserId = authService.currentUser?.id,
+                if let currentUserId = authService.currentUser?.id,
                    let firstPartnerStory = storyService.partnerStories.first {
+                    let partnerStories = storyService.partnerStories
+                    let latestPartnerStory = partnerStories.last ?? firstPartnerStory
+                    let allViewed = partnerStories.allSatisfy { $0.isViewedBy(userId: currentUserId) }
+                    let partnerActiveColors: [Color] = [
+                        .pink,
+                        themeManager.currentTheme.primaryColor,
+                        themeManager.currentTheme.secondaryColor,
+                        .purple
+                    ]
+                    let mutedColors: [Color] = [
+                        Color.gray.opacity(0.55),
+                        Color.gray.opacity(0.3)
+                    ]
+                    
                     VStack(spacing: 8) {
-                        ZStack {
-                            // Circle with gradient border
-                            let allViewed = storyService.partnerStories.allSatisfy { $0.isViewedBy(userId: currentUserId) }
-                            
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: allViewed ?
-                                            [.gray.opacity(0.5), .gray.opacity(0.3)] :
-                                            [.pink, .purple],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 74, height: 74)
-                                .shimmer(isActive: !allViewed)
-                                .pulse(isActive: !allViewed)
-                            
-                            // Avatar
-                            UserAvatarView(photoURL: firstPartnerStory.createdByPhotoURL)
-                            
-                            // Story count badge
-                            if storyService.partnerStories.count > 1 {
-                                Text("\(storyService.partnerStories.count)")
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                    .frame(width: 22, height: 22)
-                                    .background(Color.pink)
-                                    .clipShape(Circle())
-                                    .overlay {
-                                        Circle()
-                                            .stroke(.white, lineWidth: 2)
-                                    }
-                                    .offset(x: 25, y: -25)
-                            }
-                        }
+                        StoryRing(
+                            size: 78,
+                            imageURL: nil,
+                            fallbackURL: latestPartnerStory.createdByPhotoURL,
+                            placeholderSystemImage: "person.fill",
+                            gradientColors: allViewed ? mutedColors : partnerActiveColors,
+                            isDimmed: allViewed,
+                            badgeCount: allViewed
+                                ? nil
+                                : partnerStories.filter { !$0.isViewedBy(userId: currentUserId) }.count,
+                            plusColor: nil,
+                            showUnreadIndicator: !allViewed,
+                            unreadGradientColors: partnerActiveColors
+                        )
                         .onTapGesture {
-                            if let userId = authService.currentUser?.id {
-                                let stories = storyService.partnerStories
-                                let index = getStartIndex(for: stories, userId: userId)
-                                storyPresentation = StoryPresentation(stories: stories, startIndex: index)
-                            }
+                            let index = getStartIndex(for: partnerStories, userId: currentUserId)
+                            storyPresentation = StoryPresentation(stories: partnerStories, startIndex: index)
                         }
                         
-                        Text(firstPartnerStory.createdByName)
+                        Text(latestPartnerStory.createdByName)
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
-                    .frame(width: 74)
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .padding(.vertical, 14)
         }
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
         .fullScreenCover(item: $storyPresentation) { presentation in
             StoryViewer(stories: presentation.stories, startIndex: presentation.startIndex)
@@ -190,107 +141,144 @@ struct StoryCircles: View {
     }
 }
 
-// MARK: - User Avatar View
-struct UserAvatarView: View {
-    let photoURL: String?
+// MARK: - Story Ring
+
+private struct StoryRing: View {
+    let size: CGFloat
+    let imageURL: String?
+    let fallbackURL: String?
+    let placeholderSystemImage: String
+    let gradientColors: [Color]
+    let isDimmed: Bool
+    let badgeCount: Int?
+    let plusColor: Color?
+    let showUnreadIndicator: Bool
+    let unreadGradientColors: [Color]
+    
+    @State private var isAnimatingRing = false
     
     var body: some View {
-        if let photoURL = photoURL {
-            CachedAsyncImage(url: photoURL, thumbnail: true) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 68, height: 68)
-                    .clipShape(Circle())
-            } placeholder: {
-                Circle()
-                    .fill(.gray.opacity(0.3))
-                    .frame(width: 68, height: 68)
-                    .overlay {
-                        Image(systemName: "person.fill")
-                            .foregroundColor(.white)
-                            .font(.system(size: 30))
-                    }
-            }
-        } else {
+        let ringWidth: CGFloat = 4
+        let innerSize = size - ringWidth * 2.6
+        let shouldAnimateRing = showUnreadIndicator && !isDimmed
+        let activeGradientColors = (showUnreadIndicator && !unreadGradientColors.isEmpty) ? unreadGradientColors : gradientColors
+        
+        ZStack {
             Circle()
-                .fill(.gray.opacity(0.3))
-                .frame(width: 68, height: 68)
-                .overlay {
-                    Image(systemName: "person.fill")
-                        .foregroundColor(.white)
-                        .font(.system(size: 30))
-                }
+                .fill(Color.white.opacity(0.04))
+                .frame(width: size, height: size)
+                .overlay(
+                    Circle()
+                        .strokeBorder(
+                            AngularGradient(
+                                gradient: Gradient(colors: activeGradientColors),
+                                center: .center
+                            ),
+                            lineWidth: ringWidth
+                        )
+                        .opacity(isDimmed ? 0.45 : 1.0)
+                        .rotationEffect(.degrees(isAnimatingRing ? 360 : 0))
+                        .animation(
+                            shouldAnimateRing
+                                ? .linear(duration: 5).repeatForever(autoreverses: false)
+                                : .easeOut(duration: 0.35),
+                            value: isAnimatingRing
+                        )
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(0.15), lineWidth: 0.8)
+                )
+            
+            StoryImageView(
+                imageURL: imageURL,
+                fallbackURL: fallbackURL,
+                placeholderSystemImage: placeholderSystemImage
+            )
+            .frame(width: innerSize, height: innerSize)
+            .clipShape(Circle())
+            .overlay(
+                Circle()
+                    .stroke(Color.white.opacity(0.75), lineWidth: 1.4)
+            )
+            .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 4)
+        }
+        .frame(width: size, height: size)
+        .overlay(alignment: .bottomTrailing) {
+            if let plusColor = plusColor {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [plusColor, plusColor.opacity(0.85)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 22, height: 22)
+                    .overlay {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .shadow(color: plusColor.opacity(0.4), radius: 6, x: 0, y: 4)
+                    .offset(x: 6, y: 6)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if let badgeCount = badgeCount, badgeCount > 0 {
+                Text("\(badgeCount)")
+                    .font(.caption2.weight(.bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.black.opacity(0.55))
+                    )
+                    .overlay {
+                        Capsule(style: .continuous)
+                            .stroke(Color.white.opacity(0.35), lineWidth: 1)
+                    }
+                    .offset(x: 6, y: -6)
+            }
+        }
+        .onAppear {
+            isAnimatingRing = shouldAnimateRing
+        }
+        .onChange(of: shouldAnimateRing) { _, newValue in
+            isAnimatingRing = newValue
         }
     }
 }
 
-// MARK: - Shimmer Effect Modifier
-struct ShimmerEffect: ViewModifier {
-    @State private var phase: CGFloat = 0
-    let isActive: Bool
-    
-    func body(content: Content) -> some View {
-        content
-            .overlay {
-                if isActive {
-                    GeometryReader { geometry in
-                        LinearGradient(
-                            colors: [
-                                .white.opacity(0),
-                                .white.opacity(0.3),
-                                .white.opacity(0),
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                        .rotationEffect(.degrees(30))
-                        .offset(x: -geometry.size.width + (geometry.size.width * 2 * phase))
-                        .onAppear {
-                            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                                phase = 1
-                            }
-                        }
-                    }
-                    .clipShape(Circle())
-                }
-            }
-    }
-}
+// MARK: - Story Image
 
-// MARK: - Pulse Effect Modifier
-struct PulseEffect: ViewModifier {
-    @State private var isPulsing = false
-    let isActive: Bool
+private struct StoryImageView: View {
+    let imageURL: String?
+    let fallbackURL: String?
+    let placeholderSystemImage: String
     
-    func body(content: Content) -> some View {
-        content
-            .scaleEffect(isActive && isPulsing ? 1.05 : 1.0)
-            .onAppear {
-                if isActive {
-                    withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
-                        isPulsing = true
-                    }
-                }
+    var body: some View {
+        if let urlString = imageURL ?? fallbackURL {
+            CachedAsyncImage(url: urlString, thumbnail: true) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+            } placeholder: {
+                placeholder
             }
-            .onChange(of: isActive) { _, newValue in
-                if newValue {
-                    withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
-                        isPulsing = true
-                    }
-                } else {
-                    isPulsing = false
-                }
-            }
-    }
-}
-
-extension View {
-    func shimmer(isActive: Bool = true) -> some View {
-        modifier(ShimmerEffect(isActive: isActive))
+        } else {
+            placeholder
+        }
     }
     
-    func pulse(isActive: Bool = true) -> some View {
-        modifier(PulseEffect(isActive: isActive))
+    private var placeholder: some View {
+        ZStack {
+            Circle()
+                .fill(Color.gray.opacity(0.25))
+            Image(systemName: placeholderSystemImage)
+                .font(.system(size: 26, weight: .medium))
+                .foregroundColor(.white.opacity(0.9))
+        }
     }
 }
