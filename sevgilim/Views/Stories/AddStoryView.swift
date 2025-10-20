@@ -16,9 +16,7 @@ struct AddStoryView: View {
     @State private var showingImagePicker = false
     @State private var showingCamera = false
     @State private var showingSourceOptions = false
-    @State private var isUploading = false
-    @State private var showingError = false
-    @State private var errorMessage = ""
+    @StateObject private var uploadState = UploadState(message: "Story yükleniyor...")
     
     var body: some View {
         NavigationView {
@@ -101,7 +99,7 @@ struct AddStoryView: View {
                         // Upload Button
                         Button(action: uploadStory) {
                             HStack {
-                                if isUploading {
+                                if uploadState.isUploading {
                                     ProgressView()
                                         .tint(.white)
                                 } else {
@@ -116,8 +114,8 @@ struct AddStoryView: View {
                             .background(themeManager.currentTheme.primaryColor)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
-                        .disabled(isUploading)
-                        .opacity(isUploading ? 0.6 : 1.0)
+                        .disabled(uploadState.isUploading)
+                        .opacity(uploadState.isUploading ? 0.6 : 1.0)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 20)
                         
@@ -214,10 +212,17 @@ struct AddStoryView: View {
                 }
                 Button("İptal", role: .cancel) { }
             }
-            .alert("Hata", isPresented: $showingError) {
+            .overlay(UploadStatusOverlay(state: uploadState))
+            .alert(
+                "Hata",
+                isPresented: Binding(
+                    get: { uploadState.errorMessage != nil },
+                    set: { if !$0 { uploadState.errorMessage = nil } }
+                )
+            ) {
                 Button("Tamam", role: .cancel) { }
             } message: {
-                Text(errorMessage)
+                Text(uploadState.errorMessage ?? "")
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
@@ -229,13 +234,12 @@ struct AddStoryView: View {
               let userId = authService.currentUser?.id,
               let relationshipId = authService.currentUser?.relationshipId,
               let userName = authService.currentUser?.name else {
-            errorMessage = "Kullanıcı bilgileri alınamadı"
-            showingError = true
+            uploadState.fail(with: "Kullanıcı bilgileri alınamadı")
             return
         }
         
-        isUploading = true
-        
+        uploadState.start(message: "Story yükleniyor...")
+
         Task {
             do {
                 _ = try await storyService.uploadStory(
@@ -247,13 +251,12 @@ struct AddStoryView: View {
                 )
                 
                 await MainActor.run {
+                    uploadState.finish()
                     dismiss()
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "Story yüklenirken hata oluştu: \(error.localizedDescription)"
-                    showingError = true
-                    isUploading = false
+                    uploadState.fail(with: "Story yüklenirken hata oluştu: \(error.localizedDescription)")
                 }
             }
         }

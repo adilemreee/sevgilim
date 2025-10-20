@@ -10,6 +10,7 @@ struct MainTabView: View {
     @EnvironmentObject var authService: AuthenticationService
     @EnvironmentObject var relationshipService: RelationshipService
     @EnvironmentObject var surpriseService: SurpriseService
+    @EnvironmentObject var specialDayService: SpecialDayService
     @EnvironmentObject var memoryService: MemoryService
     @EnvironmentObject var photoService: PhotoService
     @EnvironmentObject var noteService: NoteService
@@ -24,7 +25,19 @@ struct MainTabView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            HomeView()
+            HomeView(
+                viewModel: HomeViewModel(
+                    authService: authService,
+                    relationshipService: relationshipService,
+                    memoryService: memoryService,
+                    photoService: photoService,
+                    noteService: noteService,
+                    planService: planService,
+                    surpriseService: surpriseService,
+                    specialDayService: specialDayService,
+                    messageService: messageService
+                )
+            )
                 .tag(0)
                 .tabItem {
                     Image(systemName: selectedTab == 0 ? "house.fill" : "house")
@@ -85,5 +98,3 @@ struct MainTabView: View {
         }
     }
 }
-
-

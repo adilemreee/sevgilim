@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict/>
+<dict>
+	<key>SpotifyClientID</key>
+	<string>ebb22c9c8dd9465b95c93902edb083c6</string>
+	<key>SpotifyClientSecret</key>
+	<string>0d3b4d9106c44439936fc08a470ace81</string>
+</dict>
 </plist>

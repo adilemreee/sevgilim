@@ -10,25 +10,19 @@ import Combine
 
 struct HomeView: View {
     // MARK: - Environment Objects
-    @EnvironmentObject var authService: AuthenticationService
-    @EnvironmentObject var relationshipService: RelationshipService
-    @EnvironmentObject var themeManager: ThemeManager
-    @EnvironmentObject var photoService: PhotoService
-    @EnvironmentObject var memoryService: MemoryService
-    @EnvironmentObject var noteService: NoteService
-    @EnvironmentObject var planService: PlanService
-    @EnvironmentObject var movieService: MovieService
-    @EnvironmentObject var placeService: PlaceService
-    @EnvironmentObject var songService: SongService
-    @EnvironmentObject var surpriseService: SurpriseService
-    @EnvironmentObject var specialDayService: SpecialDayService
-    @EnvironmentObject var storyService: StoryService
-    @EnvironmentObject var messageService: MessageService
-    @EnvironmentObject var greetingService: GreetingService
+    @EnvironmentObject private var themeManager: ThemeManager
+    @EnvironmentObject private var greetingService: GreetingService
+    @EnvironmentObject private var messageService: MessageService
+    
+    // MARK: - View Model
+    @StateObject private var viewModel: HomeViewModel
+    
+    init(viewModel: HomeViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
     
     // MARK: - State
     @State private var currentDate = Date()
-    @State private var animateHearts = false
     @State private var showingMenu = false
     @State private var navigateToPlans = false
     @State private var navigateToMovies = false
@@ -51,14 +45,13 @@ struct HomeView: View {
                 // Content
                 ScrollView {
                     VStack(spacing: 30) {
-                        if let relationship = relationshipService.currentRelationship,
-                           let _ = authService.currentUser {
+                        if let relationship = viewModel.relationship,
+                           let currentUser = viewModel.currentUser {
                             
                             // Couple Header
                             CoupleHeaderCard(
                                 user1Name: relationship.user1Name,
-                                user2Name: relationship.user2Name,
-                                animateHearts: $animateHearts
+                                user2Name: relationship.user2Name
                             )
                             
                             // Story Circles (Instagram-style)
@@ -71,15 +64,14 @@ struct HomeView: View {
                             }
                             
                             // Partner Surprise
-                            if let currentUser = authService.currentUser,
-                               let userId = currentUser.id,
-                               let surprise = surpriseService.nextUpcomingSurpriseForUser(userId: userId) {
+                            if let userId = currentUser.id,
+                               let surprise = viewModel.nextUpcomingSurprise(for: userId) {
                                 PartnerSurpriseHomeCard(
                                     surprise: surprise,
                                     onTap: { navigateToSurprises = true },
                                     onOpen: {
                                         Task {
-                                            try? await surpriseService.markAsOpened(surprise)
+                                            try? await viewModel.markSurpriseAsOpened(surprise)
                                         }
                                     }
                                 )
@@ -94,15 +86,15 @@ struct HomeView: View {
                             
                             // Quick Stats Grid
                             QuickStatsGrid(
-                                photosCount: photoService.photos.count,
-                                memoriesCount: memoryService.memories.count,
-                                notesCount: noteService.notes.count,
-                                plansCount: planService.plans.count,
+                                photosCount: viewModel.photosCount,
+                                memoriesCount: viewModel.memoriesCount,
+                                notesCount: viewModel.notesCount,
+                                plansCount: viewModel.plansCount,
                                 theme: themeManager.currentTheme
                             )
                             
                             // Upcoming Special Day
-                            if let nextDay = specialDayService.nextSpecialDay(),
+                            if let nextDay = viewModel.nextSpecialDay,
                                nextDay.daysUntil <= 30 {
                                 UpcomingSpecialDayWidget(
                                     specialDay: nextDay,
@@ -111,19 +103,18 @@ struct HomeView: View {
                             }
                             
                             // Recent Memories
-                            if !memoryService.memories.isEmpty {
+                            if !viewModel.recentMemories.isEmpty {
                                 RecentMemoriesCard(
-                                    memories: Array(memoryService.memories.prefix(3))
+                                    memories: Array(viewModel.recentMemories)
                                 )
                             }
                             
                             // Upcoming Plans
-                            if !planService.plans.filter({ !$0.isCompleted }).isEmpty {
+                            if !viewModel.activePlans.isEmpty {
                                 UpcomingPlansCard(
-                                    plans: Array(planService.plans.filter { !$0.isCompleted }.prefix(3))
+                                    plans: Array(viewModel.activePlans.prefix(3))
                                 )
                             }
-                            
                         }
                     }
                     .padding(.horizontal, 20)
@@ -132,26 +123,26 @@ struct HomeView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingMenu = true
-                    } label: {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 20, weight: .semibold))
-//                            .foregroundColor(.white)
-                            .foregroundStyle(.white)
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            showingMenu = true
+                        } label: {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.system(size: 20, weight: .semibold))
+    //                            .foregroundColor(.white)
+                                .foregroundStyle(.white)
+                        }
+                            .buttonStyle(.plain)
+    //                    .glassEffect()
                     }
-                        .buttonStyle(.plain)
-//                    .glassEffect()
                 }
-            }
            .toolbarBackground(.hidden, for: .navigationBar)
             
             // Navigation Destinations
             .navigationDestination(isPresented: $navigateToPlans) { PlansView() }
             .navigationDestination(isPresented: $navigateToMovies) { MoviesView() }
             .navigationDestination(isPresented: $navigateToChat) {
-                ChatView().environmentObject(messageService)
+                ChatView().environmentObject(viewModel.messageService)
             }
             .navigationDestination(isPresented: $navigateToPlaces) { PlacesView() }
             .navigationDestination(isPresented: $navigateToSongs) { SongsView() }
@@ -169,14 +160,6 @@ struct HomeView: View {
                     onSurprisesSelected: { navigateWithDelay(to: $navigateToSurprises) },
                     onSpecialDaysSelected: { navigateWithDelay(to: $navigateToSpecialDays) }
                 )
-                .environmentObject(themeManager)
-                .environmentObject(planService)
-                .environmentObject(movieService)
-                .environmentObject(placeService)
-                .environmentObject(songService)
-                .environmentObject(surpriseService)
-                .environmentObject(specialDayService)
-                .environmentObject(messageService)
                 .presentationDetents([.height(600)])
                 .presentationDragIndicator(.visible)
             }
@@ -186,8 +169,7 @@ struct HomeView: View {
                 currentDate = Date()
             }
             .task {
-                setupServices()
-                startAnimations()
+                viewModel.startListeners()
             }
         }
     }
@@ -202,22 +184,4 @@ struct HomeView: View {
         }
     }
     
-    /// Setup Firebase listeners
-    private func setupServices() {
-        guard let relationshipId = authService.currentUser?.relationshipId,
-              let userId = authService.currentUser?.id else { return } // <-- userId'yi de alın
-        
-        relationshipService.listenToRelationship(relationshipId: relationshipId)
-        specialDayService.listenToSpecialDays(relationshipId: relationshipId)
-        messageService.listenToUnreadMessagesCount(relationshipId: relationshipId, currentUserId: userId)
-    }
-    
-    /// Start UI animations
-    private func startAnimations() {
-        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-            animateHearts = true
-        }
-    }
 }
-
-

@@ -12,12 +12,46 @@ class SpotifyService: ObservableObject {
     @Published var isSearching = false
     @Published var searchQuery = ""
     
-    private let clientId = "ebb22c9c8dd9465b95c93902edb083c6" // Bu değeri Spotify Developer Dashboard'dan alın
-    private let clientSecret = "0d3b4d9106c44439936fc08a470ace81" // Bu değeri Spotify Developer Dashboard'dan alın
+    private let clientId: String
+    private let clientSecret: String
     private var accessToken: String?
+
+    init(bundle: Bundle = .main, processInfo: ProcessInfo = .processInfo) {
+        let environment = processInfo.environment
+        
+        if let id = environment["SPOTIFY_CLIENT_ID"], !id.isEmpty {
+            clientId = id
+        } else if let id = bundle.object(forInfoDictionaryKey: "SpotifyClientID") as? String {
+            clientId = id
+        } else {
+            clientId = ""
+        }
+        
+        if let secret = environment["SPOTIFY_CLIENT_SECRET"], !secret.isEmpty {
+            clientSecret = secret
+        } else if let secret = bundle.object(forInfoDictionaryKey: "SpotifyClientSecret") as? String {
+            clientSecret = secret
+        } else {
+            clientSecret = ""
+        }
+        
+        if clientId.isEmpty || clientSecret.isEmpty {
+            print("⚠️ Spotify credentials are not configured. Set SPOTIFY_CLIENT_ID/SECRET environment variables or add them to Info.plist.")
+        }
+    }
+    
+    private var hasValidCredentials: Bool {
+        !clientId.isEmpty && !clientSecret.isEmpty
+    }
     
     func searchTracks(query: String) async {
         guard !query.isEmpty else {
+            searchResults = []
+            return
+        }
+        
+        guard hasValidCredentials else {
+            print("❌ Spotify credentials missing. Skipping search.")
             searchResults = []
             return
         }
@@ -72,6 +106,10 @@ class SpotifyService: ObservableObject {
     }
     
     private func getAccessToken() async throws {
+        guard hasValidCredentials else {
+            throw SpotifyError.missingCredentials
+        }
+        
         let url = URL(string: "https://accounts.spotify.com/api/token")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -156,6 +194,7 @@ struct SpotifyTokenResponse: Codable {
 }
 
 enum SpotifyError: Error {
+    case missingCredentials
     case invalidCredentials
     case networkError
     case invalidResponse

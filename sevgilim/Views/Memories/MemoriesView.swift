@@ -12,6 +12,26 @@ struct MemoriesView: View {
     
     @State private var showingAddMemory = false
     @State private var selectedMemory: Memory?
+    @State private var sortOption: MemorySortOption = .newest
+    
+    enum MemorySortOption: String, CaseIterable {
+        case newest = "En Yeni"
+        case oldest = "En Eski"
+        case alphabetical = "A-Z"
+    }
+    
+    private var sortedMemories: [Memory] {
+        switch sortOption {
+        case .newest:
+            return memoryService.memories.sorted { $0.date > $1.date }
+        case .oldest:
+            return memoryService.memories.sorted { $0.date < $1.date }
+        case .alphabetical:
+            return memoryService.memories.sorted {
+                $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+            }
+        }
+    }
     
     var body: some View {
         ZStack {
@@ -55,6 +75,15 @@ struct MemoriesView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 15)
                 
+                Picker("", selection: $sortOption) {
+                    ForEach(MemorySortOption.allCases, id: \.self) { option in
+                        Text(option.rawValue).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 15)
+                
                 // Content
                 if memoryService.memories.isEmpty {
                     VStack(spacing: 20) {
@@ -87,7 +116,7 @@ struct MemoriesView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            ForEach(memoryService.memories) { memory in
+                            ForEach(sortedMemories) { memory in
                                 MemoryCardModern(memory: memory)
                                     .onTapGesture {
                                         selectedMemory = memory
@@ -140,6 +169,7 @@ struct MemoriesView: View {
         }
     }
 }
+
 
 // Modern Memory Card
 struct MemoryCardModern: View {
@@ -510,66 +540,29 @@ struct AddMemoryView: View {
     @State private var showingImagePicker = false
     @State private var tagInput = ""
     @State private var tags: [String] = []
-    @State private var isUploading = false
+    @StateObject private var uploadState = UploadState(message: "Anı kaydediliyor...")
     
     var body: some View {
         NavigationView {
-            Form {
-                Section {
-                    if let image = selectedImage {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 200)
-                            .onTapGesture {
-                                showingImagePicker = true
-                            }
-                    } else {
-                        Button(action: { showingImagePicker = true }) {
-                            Label("Fotoğraf Ekle (isteğe bağlı)", systemImage: "photo.badge.plus")
-                        }
-                    }
-                }
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        themeManager.currentTheme.primaryColor.opacity(0.25),
+                        themeManager.currentTheme.secondaryColor.opacity(0.18)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
                 
-                Section("Anı Detayları") {
-                    TextField("Başlık", text: $title)
-                    TextEditor(text: $content)
-                        .frame(minHeight: 100)
-                    DatePicker("Tarih", selection: $date, displayedComponents: .date)
-                    .environment(\.locale, Locale(identifier: "tr_TR"))
-                    TextField("Konum (isteğe bağlı)", text: $location)
-                }
-                
-                Section("Etiketler") {
-                    HStack {
-                        TextField("Etiket ekle", text: $tagInput)
-                        Button("Ekle") {
-                            if !tagInput.isEmpty {
-                                tags.append(tagInput)
-                                tagInput = ""
-                            }
-                        }
+                ScrollView {
+                    VStack(spacing: 24) {
+                        imagePickerSection
+                        detailsSection
+                        tagsSection
                     }
-                    
-                    if !tags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack {
-                                ForEach(tags, id: \.self) { tag in
-                                    HStack {
-                                        Text("#\(tag)")
-                                        Button(action: { tags.removeAll { $0 == tag } }) {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(Color(.systemGray5))
-                                    .cornerRadius(8)
-                                }
-                            }
-                        }
-                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 24)
                 }
             }
             .navigationTitle("Yeni Anı")
@@ -585,38 +578,37 @@ struct AddMemoryView: View {
                     Button("Kaydet") {
                         saveMemory()
                     }
-                    .disabled(title.isEmpty || content.isEmpty || isUploading)
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                              content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                              uploadState.isUploading)
                 }
             }
-            .sheet(isPresented: $showingImagePicker) {
-                ImagePicker(image: $selectedImage)
-            }
-            .overlay {
-                if isUploading {
-                    ZStack {
-                        Color.black.opacity(0.3)
-                            .ignoresSafeArea()
-                        
-                        VStack(spacing: 15) {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                            Text("Kaydediliyor...")
-                                .foregroundColor(.white)
-                        }
-                        .padding(30)
-                        .background(Color(.systemBackground))
-                        .cornerRadius(15)
-                    }
-                }
-            }
+        }
+        .sheet(isPresented: $showingImagePicker) {
+            ImagePicker(image: $selectedImage)
+        }
+        .overlay(UploadStatusOverlay(state: uploadState))
+        .alert(
+            "Hata",
+            isPresented: Binding(
+                get: { uploadState.errorMessage != nil },
+                set: { if !$0 { uploadState.errorMessage = nil } }
+            )
+        ) {
+            Button("Tamam", role: .cancel) { }
+        } message: {
+            Text(uploadState.errorMessage ?? "")
         }
     }
     
     private func saveMemory() {
         guard let userId = authService.currentUser?.id,
-              let relationshipId = authService.currentUser?.relationshipId else { return }
+              let relationshipId = authService.currentUser?.relationshipId else {
+            uploadState.fail(with: "Kullanıcı bilgileri alınamadı")
+            return
+        }
         
-        isUploading = true
+        uploadState.start(message: "Anı kaydediliyor...")
         Task {
             do {
                 var photoURL: String? = nil
@@ -626,25 +618,299 @@ struct AddMemoryView: View {
                 
                 try await memoryService.addMemory(
                     relationshipId: relationshipId,
-                    title: title,
-                    content: content,
+                    title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+                    content: content.trimmingCharacters(in: .whitespacesAndNewlines),
                     date: date,
                     photoURL: photoURL,
-                    location: location.isEmpty ? nil : location,
+                    location: location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : location,
                     tags: tags.isEmpty ? nil : tags,
                     userId: userId
                 )
                 
                 await MainActor.run {
+                    uploadState.finish()
                     dismiss()
                 }
             } catch {
                 print("Error saving memory: \(error)")
                 await MainActor.run {
-                    isUploading = false
+                    uploadState.fail(with: "Anı kaydedilirken hata oluştu: \(error.localizedDescription)")
                 }
             }
         }
     }
+    
+    private func addTag() {
+        let trimmed = tagInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if !tags.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            tags.append(trimmed)
+        }
+        tagInput = ""
+    }
+    
+    @ViewBuilder
+    private var imagePickerSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Fotoğraf")
+                .font(.headline)
+            Text("Anıyı daha özel kılmak için bir fotoğraf ekleyebilirsin.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            if let image = selectedImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(maxHeight: 230)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+                
+                HStack(spacing: 12) {
+                    Button {
+                        showingImagePicker = true
+                    } label: {
+                        Label("Fotoğrafı Değiştir", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.subheadline.bold())
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(themeManager.currentTheme.primaryColor.opacity(0.16))
+                            )
+                    }
+                    
+                    Button(role: .destructive) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedImage = nil
+                        }
+                    } label: {
+                        Label("Kaldır", systemImage: "trash")
+                            .font(.subheadline.bold())
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color.red.opacity(0.12))
+                            )
+                    }
+                }
+                .foregroundColor(themeManager.currentTheme.primaryColor)
+            } else {
+                Button {
+                    showingImagePicker = true
+                } label: {
+                    VStack(spacing: 16) {
+                        Image(systemName: "photo.on.rectangle")
+                            .font(.system(size: 44, weight: .medium))
+                            .foregroundColor(themeManager.currentTheme.primaryColor)
+                        Text("Fotoğraf eklemek için dokun")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 220)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(Color(.systemBackground).opacity(0.65))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .strokeBorder(
+                                themeManager.currentTheme.primaryColor.opacity(0.35),
+                                style: StrokeStyle(lineWidth: 1.4, dash: [8, 6])
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 10)
+    }
+    
+    @ViewBuilder
+    private var detailsSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Anı Detayları")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 12) {
+                detailFieldLabel("Başlık")
+                TextField("", text: $title, prompt: Text("Örneğin: İlk konser gecemiz"))
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color(.systemBackground).opacity(0.94))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(themeManager.currentTheme.primaryColor.opacity(0.08), lineWidth: 1)
+                    )
+            }
+            
+            VStack(alignment: .leading, spacing: 12) {
+                detailFieldLabel("Anı")
+                ZStack(alignment: .topLeading) {
+                    if content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Anını tüm detaylarıyla yaz...")
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 18)
+                    }
+                    contentEditor
+                        .frame(minHeight: 160)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color(.systemBackground).opacity(0.94))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(themeManager.currentTheme.primaryColor.opacity(0.08), lineWidth: 1)
+                )
+            }
+            
+            VStack(alignment: .leading, spacing: 12) {
+                detailFieldLabel("Tarih")
+                HStack(spacing: 12) {
+                    Image(systemName: "calendar")
+                        .foregroundColor(themeManager.currentTheme.primaryColor)
+                    DatePicker("", selection: $date, displayedComponents: .date)
+                        .labelsHidden()
+                        .environment(\.locale, Locale(identifier: "tr_TR"))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color(.systemBackground).opacity(0.94))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(themeManager.currentTheme.primaryColor.opacity(0.08), lineWidth: 1)
+                )
+            }
+            
+            VStack(alignment: .leading, spacing: 12) {
+                detailFieldLabel("Konum (isteğe bağlı)")
+                TextField("", text: $location, prompt: Text("Örneğin: Moda Sahnesi"))
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color(.systemBackground).opacity(0.94))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(themeManager.currentTheme.primaryColor.opacity(0.08), lineWidth: 1)
+                    )
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 10)
+    }
+    
+    @ViewBuilder
+    private var tagsSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Etiketler")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    TextField("", text: $tagInput, prompt: Text("Etiket ekle"))
+                        .textFieldStyle(.plain)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color(.systemBackground).opacity(0.94))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(themeManager.currentTheme.primaryColor.opacity(0.08), lineWidth: 1)
+                        )
+                        .onSubmit(addTag)
+                    
+                    Button(action: addTag) {
+                        Image(systemName: "plus")
+                            .font(.headline)
+                            .frame(width: 46, height: 46)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(themeManager.currentTheme.primaryColor)
+                            )
+                            .foregroundColor(.white)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                if !tags.isEmpty {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 10)], spacing: 10) {
+                        ForEach(tags, id: \.self) { tag in
+                            HStack(spacing: 6) {
+                                Text("#\(tag)")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                Button {
+                                    tags.removeAll { $0 == tag }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(themeManager.currentTheme.primaryColor.opacity(0.15))
+                            )
+                            .foregroundColor(themeManager.currentTheme.primaryColor)
+                        }
+                    }
+                } else {
+                    Text("Etiketler, anıları kategorize etmenize yardımcı olur. Örneğin: tatil, kutlama, yıldönümü.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 10)
+    }
+    
+    @ViewBuilder
+    private var contentEditor: some View {
+        if #available(iOS 16.0, *) {
+            TextEditor(text: $content)
+                .scrollContentBackground(.hidden)
+        } else {
+            TextEditor(text: $content)
+        }
+    }
+    
+    private func detailFieldLabel(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(.caption.weight(.semibold))
+            .foregroundColor(.secondary)
+            .kerning(0.5)
+    }
 }
-

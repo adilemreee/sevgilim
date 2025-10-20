@@ -4,24 +4,39 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct FullScreenPhotoViewer: View {
-    @Environment(\.dismiss) var dismiss
-    @EnvironmentObject var photoService: PhotoService
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var photoService: PhotoService
     
-    @Binding var photos: [Photo]
-    @State var selectedIndex: Int
+    @Binding private var currentIndex: Int
+    private let onClose: () -> Void
     
+    @State private var pageIndex: Int
     @State private var showControls = true
     @State private var showShareSheet = false
     @State private var showDeleteAlert = false
     @State private var imageToShare: UIImage?
+    @State private var hasDismissed = false
     
-    var currentPhoto: Photo? {
-        guard !photos.isEmpty, selectedIndex >= 0, selectedIndex < photos.count else {
-            return nil
-        }
-        return photos[selectedIndex]
+    private var photos: [Photo] { photoService.photos }
+    private var photoCount: Int { photos.count }
+    
+    private var clampedPageIndex: Int {
+        guard photoCount > 0 else { return 0 }
+        return min(max(pageIndex, 0), photoCount - 1)
+    }
+    
+    private var currentPhoto: Photo? {
+        guard photoCount > 0 else { return nil }
+        return photos[clampedPageIndex]
+    }
+    
+    init(currentIndex: Binding<Int>, onClose: @escaping () -> Void) {
+        _currentIndex = currentIndex
+        self.onClose = onClose
+        _pageIndex = State(initialValue: currentIndex.wrappedValue)
     }
     
     var body: some View {
@@ -29,8 +44,7 @@ struct FullScreenPhotoViewer: View {
             Color.black
                 .ignoresSafeArea()
             
-            // Güvenlik kontrolü: Eğer photos boşsa dismiss
-            if photos.isEmpty {
+            if photoCount == 0 {
                 VStack(spacing: 20) {
                     Image(systemName: "photo.fill.on.rectangle.fill")
                         .font(.system(size: 60))
@@ -40,149 +54,14 @@ struct FullScreenPhotoViewer: View {
                         .font(.headline)
                 }
                 .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        dismiss()
-                    }
+                    closeViewer()
                 }
-            }
-            
-            // Main Content
-            VStack(spacing: 0) {
-                // Photo carousel - Swipe hızlı geçişler için
-                TabView(selection: $selectedIndex) {
-                    ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
-                        PhotoViewerContent(photo: photo) {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                showControls.toggle()
-                            }
-                        }
-                        .id(photo.id) // Her fotoğraf için yeni view oluştur
-                        .tag(index)
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .indexViewStyle(.page(backgroundDisplayMode: .never))
-            }
-            
-            // Overlay Controls
-            VStack {
-                // Top bar
-                if showControls {
-                    HStack {
-                        Button(action: { dismiss() }) {
-                            ZStack {
-                                Circle()
-                                    .fill(.ultraThinMaterial)
-                                    .frame(width: 44, height: 44)
-                                
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        
-                        Spacer()
-                        
-                        HStack(spacing: 12) {
-                            Button(action: { shareCurrentPhoto() }) {
-                                ZStack {
-                                    Circle()
-                                        .fill(.ultraThinMaterial)
-                                        .frame(width: 44, height: 44)
-                                    
-                                    Image(systemName: "square.and.arrow.up")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.white)
-                                }
-                            }
-                            
-                            Button(action: { showDeleteAlert = true }) {
-                                ZStack {
-                                    Circle()
-                                        .fill(.ultraThinMaterial)
-                                        .frame(width: 44, height: 44)
-                                    
-                                    Image(systemName: "trash")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(.red)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 60)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-                
-                Spacer()
-                
-                // Bottom info
-                if showControls, let photo = currentPhoto {
-                    VStack(spacing: 16) {
-                        // Photo info
-                        VStack(spacing: 8) {
-                            if let title = photo.title, !title.isEmpty {
-                                Text(title)
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .multilineTextAlignment(.center)
-                                    .transition(.opacity)
-                            }
-                            
-                            Text(photo.date, formatter: DateFormatter.displayFormat)
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.8))
-                            
-                            if let location = photo.location, !location.isEmpty {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "location.fill")
-                                        .font(.caption)
-                                    Text(location)
-                                        .font(.caption)
-                                }
-                                .foregroundColor(.white.opacity(0.7))
-                                .transition(.opacity)
-                            }
-                        }
-                        .animation(.easeInOut(duration: 0.3), value: photo.id)
-                        
-                        // Page indicator
-                        if photos.count > 1 {
-                            // Sadece 10'dan az fotoğraf varsa noktaları göster
-                            if photos.count <= 10 {
-                                HStack(spacing: 8) {
-                                    ForEach(0..<photos.count, id: \.self) { index in
-                                        Circle()
-                                            .fill(index == selectedIndex ? Color.white : Color.white.opacity(0.4))
-                                            .frame(width: 6, height: 6)
-                                            .animation(.easeInOut(duration: 0.2), value: selectedIndex)
-                                    }
-                                }
-                            }
-                            
-                            Text("\(selectedIndex + 1) / \(photos.count)")
-                                .font(.caption2)
-                                .foregroundColor(.white.opacity(0.7))
-                                .padding(.top, 4)
-                                .animation(.easeInOut(duration: 0.2), value: selectedIndex)
-                        }
-                    }
-                    .padding(.horizontal, 30)
-                    .padding(.bottom, 50)
-                    .background(
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.8)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 250)
-                        .ignoresSafeArea(edges: .bottom)
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
+            } else {
+                carousel
+                overlayControls
             }
         }
-        .statusBar(hidden: !showControls)
+        .statusBar(hidden: photoCount > 0 ? !showControls : false)
         .sheet(isPresented: $showShareSheet) {
             if let image = imageToShare {
                 ShareSheet(items: [image])
@@ -196,27 +75,129 @@ struct FullScreenPhotoViewer: View {
         } message: {
             Text("Bu fotoğrafı silmek istediğinizden emin misiniz?")
         }
-        .onChange(of: selectedIndex) { _, _ in
-            // Reset controls when changing photos
+        .onAppear {
+            syncPageIndex()
+        }
+        .onChange(of: photoService.photos.count) { _, _ in
+            guard photoCount > 0 else {
+                closeViewer()
+                return
+            }
+            syncPageIndex()
+        }
+        .onChange(of: currentIndex) { _, _ in
+            syncPageIndex()
+        }
+        .onChange(of: pageIndex) { _, newValue in
+            guard photoCount > 0 else { return }
+            let clamped = min(max(newValue, 0), photoCount - 1)
+            if clamped != newValue {
+                pageIndex = clamped
+            }
+            if currentIndex != clamped {
+                currentIndex = clamped
+            }
             withAnimation {
                 showControls = true
             }
         }
+        .onDisappear {
+            if !hasDismissed {
+                onClose()
+            }
+        }
+    }
+    
+    private var carousel: some View {
+        TabView(selection: $pageIndex) {
+            ForEach(Array(photos.enumerated()), id: \.offset) { index, photo in
+                PhotoViewerContent(photo: photo) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showControls.toggle()
+                    }
+                }
+                .tag(index)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .indexViewStyle(.page(backgroundDisplayMode: .never))
+    }
+    
+    private var overlayControls: some View {
+        VStack(spacing: 0) {
+            if showControls {
+                HStack(alignment: .top) {
+                    Button(action: closeViewer) {
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                            )
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 10) {
+                        quickInfoChip
+                        HStack(spacing: 10) {
+                            actionButton(systemImage: "square.and.arrow.up") {
+                                shareCurrentPhoto()
+                            }
+                            actionButton(systemImage: "trash", color: .red) {
+                                showDeleteAlert = true
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 20)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            Spacer()
+        }
+    }
+    
+    private var quickInfoChip: some View {
+        HStack(spacing: 10) {
+            if let photo = currentPhoto, let location = photo.location, !location.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "location.fill")
+                        .font(.caption2)
+                    Text(location)
+                        .font(.caption.bold())
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.white.opacity(0.18), in: Capsule())
+            }
+            
+            if photoCount > 1 {
+                Text("\(clampedPageIndex + 1) / \(photoCount)")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.18), in: Capsule())
+            }
+        }
+        .foregroundColor(.white)
+    }
+    
+    private func actionButton(systemImage: String, color: Color = .white, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Circle()
+                .fill(.ultraThinMaterial)
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Image(systemName: systemImage)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(color)
+                )
+        }
     }
     
     private func shareCurrentPhoto() {
-        guard let photo = currentPhoto else {
-            print("❌ No current photo to share")
-            return
-        }
-        
-        print("📤 Starting share for photo: \(photo.imageURL)")
-        
-        guard let url = URL(string: photo.imageURL) else {
-            print("❌ Invalid URL for sharing")
-            return
-        }
-        
+        guard let photo = currentPhoto, let url = URL(string: photo.imageURL) else { return }
         Task {
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
@@ -224,49 +205,56 @@ struct FullScreenPhotoViewer: View {
                     await MainActor.run {
                         imageToShare = image
                         showShareSheet = true
-                        print("✅ Share sheet opened with image")
                     }
                 }
             } catch {
-                print("❌ Error loading image for sharing: \(error.localizedDescription)")
+                print("❌ Share error: \(error.localizedDescription)")
             }
         }
     }
     
     private func deleteCurrentPhoto() {
-        guard let photo = currentPhoto else {
-            print("❌ No current photo to delete")
-            return
-        }
-        
-        print("🗑️ Deleting photo at index: \(selectedIndex)")
-        
+        guard let photo = currentPhoto else { return }
         Task {
             do {
                 try await photoService.deletePhoto(photo)
-                
                 await MainActor.run {
-                    print("✅ Photo deleted successfully")
-                    
-                    // If it was the last photo, close the viewer
-                    if photos.count <= 1 {
-                        dismiss()
+                    let updatedCount = photoService.photos.count
+                    if updatedCount == 0 {
+                        closeViewer()
                     } else {
-                        // Adjust index if needed
-                        if selectedIndex >= photos.count - 1 {
-                            selectedIndex = max(0, photos.count - 2)
-                        }
+                        let newIndex = max(0, min(pageIndex, updatedCount - 1))
+                        pageIndex = newIndex
+                        currentIndex = newIndex
                     }
                 }
             } catch {
-                print("❌ Error deleting photo: \(error.localizedDescription)")
+                print("❌ Delete error: \(error.localizedDescription)")
             }
+        }
+    }
+    
+    private func closeViewer() {
+        guard !hasDismissed else { return }
+        hasDismissed = true
+        onClose()
+        dismiss()
+    }
+    
+    private func syncPageIndex() {
+        guard photoCount > 0 else { return }
+        let clamped = min(max(currentIndex, 0), photoCount - 1)
+        if pageIndex != clamped {
+            pageIndex = clamped
+        }
+        if currentIndex != clamped {
+            currentIndex = clamped
         }
     }
 }
 
-// MARK: - Photo Viewer Content
-struct PhotoViewerContent: View {
+
+private struct PhotoViewerContent: View {
     let photo: Photo
     let onTap: () -> Void
     
@@ -282,48 +270,37 @@ struct PhotoViewerContent: View {
         GeometryReader { geometry in
             ZStack {
                 Color.black
+                    .ignoresSafeArea()
                 
                 if isLoading {
                     VStack(spacing: 20) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             .scaleEffect(2)
-                        
                         Text("Yükleniyor...")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
-                        
                         Text(photo.imageURL)
                             .font(.caption2)
                             .foregroundColor(.white.opacity(0.5))
-                            .padding(.horizontal)
+                            .multilineTextAlignment(.center)
                             .lineLimit(2)
+                            .padding(.horizontal)
                     }
                 } else if let error = loadError {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 60))
                             .foregroundColor(.yellow)
-                        
-                        VStack(spacing: 8) {
-                            Text("Fotoğraf Yüklenemedi")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            
-                            Text(error.localizedDescription)
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
-                            
-                            Text(photo.imageURL)
-                                .font(.caption2)
-                                .foregroundColor(.white.opacity(0.5))
-                                .padding(.horizontal)
-                                .lineLimit(3)
-                        }
+                        Text("Fotoğraf yüklenemedi")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        Text(error.localizedDescription)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
-                    .padding(40)
                 } else if let image = loadedImage {
                     Image(uiImage: image)
                         .resizable()
@@ -331,52 +308,12 @@ struct PhotoViewerContent: View {
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .scaleEffect(scale)
                         .offset(offset)
-                        .gesture(
-                            MagnificationGesture()
-                                .onChanged { value in
-                                    let delta = value / lastScale
-                                    lastScale = value
-                                    let newScale = scale * delta
-                                    scale = min(max(newScale, 1), 4)
-                                }
-                                .onEnded { _ in
-                                    lastScale = 1.0
-                                    if scale < 1 {
-                                        withAnimation(.spring()) {
-                                            scale = 1
-                                            offset = .zero
-                                            lastOffset = .zero
-                                        }
-                                    }
-                                }
-                        )
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    if scale > 1 {
-                                        offset = CGSize(
-                                            width: lastOffset.width + value.translation.width,
-                                            height: lastOffset.height + value.translation.height
-                                        )
-                                    }
-                                }
-                                .onEnded { _ in
-                                    if scale > 1 {
-                                        lastOffset = offset
-                                    } else {
-                                        withAnimation(.spring()) {
-                                            offset = .zero
-                                            lastOffset = .zero
-                                        }
-                                    }
-                                }
-                        )
+                        .simultaneousGesture(magnificationGesture(in: geometry))
+                        .simultaneousGesture(dragGesture(in: geometry))
                         .onTapGesture(count: 2) {
                             withAnimation(.spring()) {
                                 if scale > 1 {
-                                    scale = 1
-                                    offset = .zero
-                                    lastOffset = .zero
+                                    resetTransform()
                                 } else {
                                     scale = 2.5
                                 }
@@ -387,26 +324,81 @@ struct PhotoViewerContent: View {
                         }
                 }
             }
-            .onAppear {
-                loadImage()
-            }
+            .onAppear { loadImage() }
         }
+    }
+    
+    private func magnificationGesture(in geometry: GeometryProxy) -> some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                let delta = value / lastScale
+                lastScale = value
+                let newScale = scale * delta
+                scale = min(max(newScale, 1), 4)
+                offset = clamped(offset, in: geometry)
+            }
+            .onEnded { _ in
+                lastScale = 1
+                if scale < 1 {
+                    withAnimation(.spring()) {
+                        resetTransform()
+                    }
+                }
+            }
+    }
+    
+    private func dragGesture(in geometry: GeometryProxy) -> some Gesture {
+        DragGesture(minimumDistance: scale > 1 ? 0 : .infinity)
+            .onChanged { value in
+                guard scale > 1 else { return }
+                let proposed = CGSize(
+                    width: lastOffset.width + value.translation.width,
+                    height: lastOffset.height + value.translation.height
+                )
+                offset = clamped(proposed, in: geometry)
+            }
+            .onEnded { _ in
+                if scale > 1 {
+                    lastOffset = offset
+                } else {
+                    withAnimation(.spring()) {
+                        resetTransform()
+                    }
+                }
+            }
+    }
+    
+    private func resetTransform() {
+        scale = 1
+        offset = .zero
+        lastOffset = .zero
+    }
+
+    private func clamped(_ proposed: CGSize, in geometry: GeometryProxy) -> CGSize {
+        guard let image = loadedImage else { return .zero }
+        let container = geometry.size
+        let baseScale = min(container.width / image.size.width, container.height / image.size.height)
+        let fittedSize = CGSize(width: image.size.width * baseScale, height: image.size.height * baseScale)
+        let scaledSize = CGSize(width: fittedSize.width * scale, height: fittedSize.height * scale)
+        let maxX = max(0, (scaledSize.width - container.width) / 2)
+        let maxY = max(0, (scaledSize.height - container.height) / 2)
+        let clampedX = max(-maxX, min(proposed.width, maxX))
+        let clampedY = max(-maxY, min(proposed.height, maxY))
+        return CGSize(width: clampedX, height: clampedY)
     }
     
     private func loadImage() {
         isLoading = true
         loadError = nil
-        
         Task {
             do {
-                // Use cached image loading for better performance
                 if let image = try await ImageCacheService.shared.loadImage(from: photo.imageURL, thumbnail: false) {
                     await MainActor.run {
                         loadedImage = image
                         isLoading = false
                     }
                 } else {
-                    throw NSError(domain: "PhotoViewer", code: -2, userInfo: [NSLocalizedDescriptionKey: "Görüntü verisi okunamadı"])
+                    throw NSError(domain: "PhotoViewer", code: -1, userInfo: [NSLocalizedDescriptionKey: "Görüntü verisi okunamadı"])
                 }
             } catch {
                 await MainActor.run {
@@ -418,13 +410,11 @@ struct PhotoViewerContent: View {
     }
 }
 
-// MARK: - Share Sheet
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        return controller
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
