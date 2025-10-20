@@ -5,6 +5,7 @@
 
 import SwiftUI
 import PhotosUI
+import UIKit
 
 struct ChatView: View {
     @EnvironmentObject var authService: AuthenticationService
@@ -21,6 +22,54 @@ struct ChatView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @FocusState private var isTextFieldFocused: Bool
+    @State private var selectedMessage: Message?
+    @State private var showingDeleteConfirmation = false
+    @State private var deleteScope: MessageService.MessageDeletionScope = .me
+    @State private var showingClearConfirmation = false
+    @State private var isPerformingAction = false
+    @State private var scrollProxy: ScrollViewProxy?
+    
+    private let reactionOptions = ["❤️", "😂", "😍", "👍", "👏", "😢"]
+    
+    private var currentUserId: String? {
+        authService.currentUser?.id
+    }
+    
+    private var clearedDate: Date {
+        guard
+            let relationship = relationshipService.currentRelationship,
+            let userId = currentUserId,
+            let cleared = relationship.chatClearedAt?[userId]
+        else {
+            return .distantPast
+        }
+        return cleared
+    }
+    
+    private var visibleMessages: [Message] {
+        guard let userId = currentUserId else { return messageService.messages }
+        return messageService.messages.filter { $0.isVisible(for: userId, clearedAfter: clearedDate) }
+    }
+    
+    private var displayMessages: [ChatDisplayMessage] {
+        let messages = visibleMessages
+        return messages.enumerated().map { index, message in
+            let previous = index > 0 ? messages[index - 1] : nil
+            let fallbackId = message.id ?? "\(message.timestamp.timeIntervalSince1970)_\(index)"
+            return ChatDisplayMessage(id: fallbackId, message: message, previousMessage: previous)
+        }
+    }
+    
+    private struct ChatDisplayMessage: Identifiable {
+        let id: String
+        let message: Message
+        let previousMessage: Message?
+        
+        var showsDateHeader: Bool {
+            guard let previous = previousMessage else { return true }
+            return !Calendar.current.isDate(message.timestamp, inSameDayAs: previous.timestamp)
+        }
+    }
     
     var body: some View {
         mainContent
@@ -47,6 +96,25 @@ struct ChatView: View {
             } message: {
                 Text(errorMessage)
             }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button {
+                            scrollToBottom()
+                        } label: {
+                            Label("En Alta Git", systemImage: "arrow.down.to.line")
+                        }
+                        
+                        Button(role: .destructive) {
+                            showingClearConfirmation = true
+                        } label: {
+                            Label("Sohbeti Temizle", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
             .overlay {
                 if isLoadingImage {
                     ZStack {
@@ -67,6 +135,25 @@ struct ChatView: View {
                     }
                 }
             }
+            .confirmationDialog("Mesajı Sil", isPresented: $showingDeleteConfirmation, actions: {
+                Button("Sil", role: .destructive) {
+                    performDelete()
+                }
+                Button("İptal", role: .cancel) {
+                    selectedMessage = nil
+                    deleteScope = .me
+                }
+            }, message: {
+                Text(deleteScope == .everyone ? "Bu mesaj her iki taraf için de silinecek." : "Bu mesaj sadece senin sohbetinden silinecek.")
+            })
+            .confirmationDialog("Sohbeti Temizle", isPresented: $showingClearConfirmation, titleVisibility: .visible) {
+                Button("Temizle", role: .destructive) {
+                    clearChatHistory()
+                }
+                Button("İptal", role: .cancel) { }
+            } message: {
+                Text("Sohbet geçmişi bu cihazda temizlenecek. Yeni mesajlar yine görünecek.")
+            }
     }
     
     private var mainContent: some View {
@@ -84,43 +171,54 @@ struct ChatView: View {
     private var messagesListView: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(spacing: 12) {
-                    ForEach(messageService.messages) { message in
-                        MessageBubble(
-                            message: message,
-                            isCurrentUser: message.senderId == authService.currentUser?.id,
-                            theme: themeManager.currentTheme
-                        )
-                        .id(message.id)
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    let items = displayMessages
+                    
+                    if items.isEmpty {
+                        EmptyChatPlaceholder()
+                            .padding(.top, 80)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        ForEach(items) { item in
+                            if item.showsDateHeader {
+                                MessageDayHeader(date: item.message.timestamp)
+                                    .padding(.leading, 8)
+                            }
+                            
+                            MessageBubble(
+                                message: item.message,
+                                isCurrentUser: item.message.senderId == currentUserId,
+                                theme: themeManager.currentTheme,
+                                currentUserId: currentUserId
+                            )
+                            .id(item.id)
+                            .contextMenu {
+                                messageContextMenu(for: item.message)
+                            }
+                        }
                     }
                     
                     if messageService.partnerIsTyping {
                         TypingIndicatorView()
                             .transition(.scale.combined(with: .opacity))
+                            .padding(.horizontal, 8)
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.vertical, 20)
             }
+            .background(Color.clear)
             .onAppear {
-                // İlk açılışta son mesaja direkt git (animasyonsuz)
-                if let lastMessage = messageService.messages.last {
-                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                }
+                scrollProxy = proxy
+                markUnreadMessagesAsRead()
+                scrollToBottom(animated: false)
             }
-            .onChange(of: messageService.messages.count) { _, _ in
-                if let lastMessage = messageService.messages.last {
-                    withAnimation {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                    }
-                }
-                // Yeni mesajlar geldiğinde okundu olarak işaretle
+            .onChange(of: displayMessages.last?.id) { _, _ in
+                scrollToBottom()
                 markUnreadMessagesAsRead()
             }
-            .onChange(of: messageService.messages.map { $0.id }) { _, _ in
-                // Mesaj listesi değiştiğinde (isRead güncellemeleri dahil)
-                // Scroll pozisyonunu koru ve okundu işaretle
-                markUnreadMessagesAsRead()
+            .onChange(of: relationshipService.currentRelationship?.chatClearedAt?[currentUserId ?? ""]) { _, _ in
+                scrollToBottom(animated: false)
             }
         }
     }
@@ -136,6 +234,148 @@ struct ChatView: View {
             onSend: sendMessage,
             onTextChanged: handleTextChanged
         )
+    }
+    
+    @ViewBuilder
+    private func messageContextMenu(for message: Message) -> some View {
+        let isCurrentUserMessage = message.senderId == currentUserId
+        
+        let canReact = !message.isGloballyDeleted
+        let canCopy = !message.isGloballyDeleted &&
+            !message.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            message.text != "📷 Fotoğraf"
+        
+        if canReact {
+            Menu("İfade bırak") {
+                ForEach(reactionOptions, id: \.self) { emoji in
+                    Button {
+                        toggleReaction(emoji, for: message)
+                    } label: {
+                        HStack {
+                            Text(emoji)
+                            if let userId = currentUserId, message.userHasReaction(emoji, userId: userId) {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+            
+        }
+        
+        if canCopy {
+            Button {
+                copyMessageText(message)
+            } label: {
+                Label("Kopyala", systemImage: "doc.on.doc")
+            }
+        }
+        
+        if canReact || canCopy {
+            Divider()
+        }
+        
+        Button(role: .destructive) {
+            presentDeleteConfirmation(for: message, scope: .me)
+        } label: {
+            Label("Benim İçin Sil", systemImage: "trash")
+        }
+        
+        if isCurrentUserMessage && !message.isGloballyDeleted {
+            Button(role: .destructive) {
+                presentDeleteConfirmation(for: message, scope: .everyone)
+            } label: {
+                Label("Herkes İçin Sil", systemImage: "trash.slash")
+            }
+        }
+    }
+
+    private func toggleReaction(_ emoji: String, for message: Message) {
+        guard let userId = currentUserId else { return }
+        Task {
+            do {
+                try await messageService.toggleReaction(message: message, emoji: emoji, userId: userId)
+            } catch {
+                await MainActor.run {
+                    showError("İfade eklenemedi: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    private func copyMessageText(_ message: Message) {
+        UIPasteboard.general.string = message.text
+    }
+    
+    private func presentDeleteConfirmation(for message: Message, scope: MessageService.MessageDeletionScope) {
+        selectedMessage = message
+        deleteScope = scope
+        showingDeleteConfirmation = true
+    }
+    
+    private func performDelete() {
+        guard !isPerformingAction,
+              let message = selectedMessage,
+              let userId = currentUserId else { return }
+        
+        isPerformingAction = true
+        Task {
+            do {
+                try await messageService.deleteMessage(message, scope: deleteScope, currentUserId: userId)
+            } catch {
+                await MainActor.run {
+                    showError("Mesaj silinemedi: \(error.localizedDescription)")
+                }
+            }
+            
+            await MainActor.run {
+                selectedMessage = nil
+                deleteScope = .me
+                showingDeleteConfirmation = false
+                isPerformingAction = false
+            }
+        }
+    }
+    
+    private func clearChatHistory() {
+        guard !isPerformingAction,
+              let relationshipId = relationshipService.currentRelationship?.id,
+              let userId = currentUserId else { return }
+        
+        isPerformingAction = true
+        Task {
+            do {
+                try await messageService.clearChat(relationshipId: relationshipId, userId: userId)
+            } catch {
+                await MainActor.run {
+                    showError("Sohbet temizlenemedi: \(error.localizedDescription)")
+                }
+            }
+            
+            await MainActor.run {
+                isPerformingAction = false
+                showingClearConfirmation = false
+            }
+        }
+    }
+    
+    private func scrollToBottom(animated: Bool = true) {
+        guard let proxy = scrollProxy,
+              let targetId = displayMessages.last?.id else { return }
+        
+        if animated {
+            withAnimation(.easeOut(duration: 0.25)) {
+                proxy.scrollTo(targetId, anchor: .bottom)
+            }
+        } else {
+            proxy.scrollTo(targetId, anchor: .bottom)
+        }
+    }
+    
+    private func showError(_ text: String) {
+        errorMessage = text
+        showError = true
     }
     
     @ViewBuilder
@@ -175,6 +415,7 @@ struct ChatView: View {
         }
         
         messageService.stopTyping(relationshipId: relationshipId, userId: userId, userName: userName)
+        scrollProxy = nil
     }
     
     private func handleImageSelection(_ newItem: PhotosPickerItem?) {
@@ -301,15 +542,18 @@ struct ChatView: View {
     }
     
     private func markUnreadMessagesAsRead() {
-        guard let currentUserId = authService.currentUser?.id else { return }
+        guard let currentUserId = currentUserId else { return }
+        let cleared = clearedDate
         
         Task {
             for message in messageService.messages {
-                if !message.isRead && message.senderId != currentUserId {
-                    if let messageId = message.id {
-                        try? await messageService.markAsRead(messageId: messageId)
-                    }
-                }
+                guard !message.isRead,
+                      message.senderId != currentUserId,
+                      message.isVisible(for: currentUserId, clearedAfter: cleared),
+                      !message.isGloballyDeleted,
+                      let messageId = message.id else { continue }
+                
+                try? await messageService.markAsRead(messageId: messageId)
             }
         }
     }
@@ -320,8 +564,49 @@ struct MessageBubble: View {
     let message: Message
     let isCurrentUser: Bool
     let theme: AppTheme
+    let currentUserId: String?
     
     @State private var showTimestamp = false
+    
+    private var reactionEntries: [ReactionEntry] {
+        message.reactionsSorted().map { ReactionEntry(emoji: $0.emoji, users: $0.users) }
+    }
+    
+    private var textColor: Color {
+        if message.isGloballyDeleted {
+            return .secondary
+        }
+        return isCurrentUser ? .white : .primary
+    }
+    
+    private var metadataColor: Color {
+        isCurrentUser ? .white.opacity(0.7) : .secondary
+    }
+    
+    @ViewBuilder
+    private var bubbleBackground: some View {
+        if message.isGloballyDeleted {
+            Color(.systemGray4)
+        } else if isCurrentUser {
+            LinearGradient(
+                colors: [theme.primaryColor, theme.secondaryColor],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else {
+            Color(.systemGray6)
+        }
+    }
+    
+    private var shouldShowText: Bool {
+        !message.isGloballyDeleted &&
+        !message.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        message.text != "📷 Fotoğraf"
+    }
+    
+    private var deletedMessageText: String {
+        isCurrentUser ? "Bu mesajı sildin" : "Mesaj silindi"
+    }
     
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -329,74 +614,62 @@ struct MessageBubble: View {
                 Spacer(minLength: 60)
             }
             
-            VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 4) {
-                // Message Content
+            VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 8) {
-                    // Story image if exists (küçük thumbnail)
-                    if let storyImageURL = message.storyImageURL {
-                        HStack(spacing: 8) {
-                            CachedAsyncImage(url: storyImageURL, thumbnail: true) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 50, height: 50)
-                                    .cornerRadius(8)
-                            } placeholder: {
-                                ZStack {
-                                    Color.gray.opacity(0.2)
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                }
-                                .frame(width: 50, height: 50)
-                                .cornerRadius(8)
-                            }
-                            
-                            Text("Story")
-                                .font(.caption)
-                                .foregroundColor(isCurrentUser ? .white.opacity(0.8) : .secondary)
-                        }
+                    if let storyImageURL = message.storyImageURL, !message.isGloballyDeleted {
+                        storyPreview(url: storyImageURL)
                     }
                     
-                    // Image if exists
-                    if let imageURL = message.imageURL {
+                    if let imageURL = message.imageURL, !message.isGloballyDeleted {
                         MessageImageView(imageURL: imageURL)
                     }
                     
-                    // Text
-                    if !message.text.isEmpty && message.text != "📷 Fotoğraf" {
+                    if message.isGloballyDeleted {
+                        Text(deletedMessageText)
+                            .font(.callout)
+                            .italic()
+                            .foregroundColor(textColor)
+                    } else if shouldShowText {
                         Text(message.text)
                             .font(.body)
-                            .foregroundColor(isCurrentUser ? .white : .primary)
-                    }
-                    
-                    // Timestamp and read receipt
-                    HStack(spacing: 4) {
-                        Text(message.timestamp, formatter: DateFormatter.timeFormat)
-                            .font(.caption2)
-                            .foregroundColor(isCurrentUser ? .white.opacity(0.7) : .secondary)
-                        
-                        if isCurrentUser {
-                            Image(systemName: message.isRead ? "checkmark.circle.fill" : "checkmark.circle")
-                                .font(.caption2)
-                                .foregroundColor(message.isRead ? .green : .white.opacity(0.7))
-                        }
+                            .foregroundColor(textColor)
                     }
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .background(
-                    isCurrentUser ?
-                    AnyView(
-                        LinearGradient(
-                            colors: [theme.primaryColor, theme.secondaryColor],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    ) :
-                    AnyView(Color(.systemGray6))
-                )
+                .background(bubbleBackground)
                 .cornerRadius(18)
                 .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                
+                if !reactionEntries.isEmpty && !message.isGloballyDeleted {
+                    HStack(spacing: 6) {
+                        ForEach(reactionEntries) { entry in
+                            reactionChip(for: entry)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
+                }
+                
+                HStack(spacing: 6) {
+                    Text(message.timestamp, formatter: DateFormatter.timeFormat)
+                        .font(.caption2)
+                        .foregroundColor(metadataColor)
+                        .padding(.leading, 2)
+                    
+                    if isCurrentUser {
+                        Image(systemName: message.isRead ? "checkmark.circle.fill" : "checkmark.circle")
+                            .font(.caption2)
+                            .foregroundColor(message.isRead ? .green : metadataColor)
+                    }
+                }
+                .opacity(message.isGloballyDeleted ? 0.6 : 1)
+                .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
+                
+                if showTimestamp {
+                    Text(message.timestamp.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
             
             if !isCurrentUser {
@@ -404,10 +677,106 @@ struct MessageBubble: View {
             }
         }
         .onTapGesture {
-            withAnimation {
+            withAnimation(.easeInOut(duration: 0.2)) {
                 showTimestamp.toggle()
             }
         }
+    }
+    
+    @ViewBuilder
+    private func storyPreview(url: String) -> some View {
+        HStack(spacing: 8) {
+            CachedAsyncImage(url: url, thumbnail: true) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 48, height: 48)
+                    .cornerRadius(10)
+            } placeholder: {
+                ZStack {
+                    Color.gray.opacity(0.2)
+                    ProgressView().scaleEffect(0.7)
+                }
+                .frame(width: 48, height: 48)
+                .cornerRadius(10)
+            }
+            
+            Text("Story yanıtı")
+                .font(.caption)
+                .foregroundColor(textColor.opacity(0.8))
+        }
+    }
+    
+    private func reactionChip(for entry: ReactionEntry) -> some View {
+        HStack(spacing: 4) {
+            Text(entry.emoji)
+            Text("\(entry.users.count)")
+        }
+        .font(.caption.bold())
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(chipBackground(for: entry))
+        .clipShape(Capsule())
+    }
+    
+    private func chipBackground(for entry: ReactionEntry) -> Color {
+        let reacted = entry.contains(userId: currentUserId)
+        if isCurrentUser {
+            return reacted ? Color.white.opacity(0.28) : Color.white.opacity(0.18)
+        } else {
+            return reacted ? theme.primaryColor.opacity(0.18) : Color.gray.opacity(0.18)
+        }
+    }
+    
+    private struct ReactionEntry: Identifiable {
+        let emoji: String
+        let users: [String]
+        var id: String { emoji }
+        
+        func contains(userId: String?) -> Bool {
+            guard let userId else { return false }
+            return users.contains(userId)
+        }
+    }
+}
+
+private struct MessageDayHeader: View {
+    let date: Date
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            DividerLine()
+            Text(date, formatter: DateFormatter.chatDayFormat)
+                .font(.caption.bold())
+                .foregroundColor(.secondary)
+            DividerLine()
+        }
+        .frame(maxWidth: .infinity)
+    }
+    
+    private struct DividerLine: View {
+        var body: some View {
+            Rectangle()
+                .fill(Color.secondary.opacity(0.2))
+                .frame(height: 1)
+        }
+    }
+}
+
+private struct EmptyChatPlaceholder: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "bubble.left.and.bubble.right")
+                .font(.system(size: 48, weight: .semibold))
+                .foregroundColor(.secondary)
+            Text("Henüz mesaj yok")
+                .font(.headline)
+                .foregroundColor(.primary)
+            Text("İlk mesajı göndererek sohbeti başlat.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .padding()
     }
 }
 
@@ -764,6 +1133,15 @@ extension DateFormatter {
     static let timeFormat: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
+        formatter.locale = Locale(identifier: "tr_TR")
+        return formatter
+    }()
+    
+    static let chatDayFormat: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        formatter.locale = Locale(identifier: "tr_TR")
         return formatter
     }()
 }
@@ -776,4 +1154,3 @@ extension DateFormatter {
             .environmentObject(ThemeManager())
     }
 }
-

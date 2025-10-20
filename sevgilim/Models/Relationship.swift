@@ -15,6 +15,7 @@ struct Relationship: Identifiable, Codable {
     var startDate: Date
     var createdAt: Date
     var themeColor: String? // Hex color code
+    var chatClearedAt: [String: Date]? = nil
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -25,6 +26,7 @@ struct Relationship: Identifiable, Codable {
         case startDate
         case createdAt
         case themeColor
+        case chatClearedAt
     }
     
     func partnerName(for userId: String) -> String {
@@ -35,4 +37,3 @@ struct Relationship: Identifiable, Codable {
         return userId == user1Id ? user2Id : user1Id
     }
 }
-

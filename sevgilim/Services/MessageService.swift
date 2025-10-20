@@ -15,6 +15,11 @@ class MessageService: ObservableObject {
     @Published var partnerIsTyping: Bool = false
     @Published var unreadMessageCount: Int = 0
     
+    enum MessageDeletionScope {
+        case me
+        case everyone
+    }
+    
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     private var messagesListener: ListenerRegistration?
@@ -151,6 +156,98 @@ class MessageService: ObservableObject {
         }
     }
     
+    // MARK: - Toggle Reaction
+    func toggleReaction(message: Message, emoji: String, userId: String) async throws {
+        guard let messageId = message.id else { return }
+        let messageRef = db.collection("messages").document(messageId)
+        
+        var reactions = message.reactions ?? [:]
+        var users = Set(reactions[emoji] ?? [])
+        
+        if users.contains(userId) {
+            users.remove(userId)
+        } else {
+            users.insert(userId)
+        }
+        
+        if users.isEmpty {
+            reactions.removeValue(forKey: emoji)
+        } else {
+            reactions[emoji] = Array(users)
+        }
+        
+        if reactions.isEmpty {
+            try await messageRef.updateData([
+                "reactions": FieldValue.delete()
+            ])
+        } else {
+            try await messageRef.updateData([
+                "reactions": reactions
+            ])
+        }
+    }
+    
+    // MARK: - Delete Message
+    func deleteMessage(_ message: Message, scope: MessageDeletionScope, currentUserId: String) async throws {
+        guard let messageId = message.id else { return }
+        let messageRef = db.collection("messages").document(messageId)
+        
+        switch scope {
+        case .me:
+            var deletedFor = Set(message.deletedForUserIds ?? [])
+            if deletedFor.contains(currentUserId) {
+                return
+            }
+            deletedFor.insert(currentUserId)
+            try await messageRef.updateData([
+                "deletedForUserIds": Array(deletedFor)
+            ])
+        case .everyone:
+            var updates: [String: Any] = [
+                "isDeletedForEveryone": true,
+                "deletedAt": FieldValue.serverTimestamp(),
+                "reactions": FieldValue.delete()
+            ]
+            
+            if !message.text.isEmpty {
+                updates["text"] = ""
+            }
+            
+            if message.imageURL != nil {
+                updates["imageURL"] = FieldValue.delete()
+            }
+            
+            if message.storyImageURL != nil {
+                updates["storyImageURL"] = FieldValue.delete()
+            }
+            
+            try await messageRef.updateData(updates)
+            
+            if let imageURL = message.imageURL {
+                removeImageFromStorage(urlString: imageURL)
+            }
+        }
+    }
+    
+    // MARK: - Clear Chat
+    func clearChat(relationshipId: String, userId: String) async throws {
+        let relationshipRef = db.collection("relationships").document(relationshipId)
+        try await relationshipRef.updateData([
+            "chatClearedAt.\(userId)": FieldValue.serverTimestamp()
+        ])
+    }
+    
+    private func removeImageFromStorage(urlString: String) {
+        let reference = storage.reference(forURL: urlString)
+        reference.delete { error in
+            if let error = error {
+                print("❌ Failed to delete message image: \(error.localizedDescription)")
+            } else {
+                print("🗑️ Message image removed from storage")
+            }
+        }
+    }
+    
     // MARK: - Mark as Read
     func markAsRead(messageId: String) async throws {
         print("✓ Marking message as read: \(messageId)")
@@ -254,4 +351,3 @@ class MessageService: ObservableObject {
         typingTimer?.invalidate()
     }
 }
-

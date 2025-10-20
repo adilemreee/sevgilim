@@ -114,6 +114,14 @@ class RelationshipService: ObservableObject {
             .document(relationshipId)
             .addSnapshotListener { snapshot, error in
                 guard let data = snapshot?.data() else { return }
+                var chatClearedAt: [String: Date] = [:]
+                if let clearedDict = data["chatClearedAt"] as? [String: Any] {
+                    for (key, value) in clearedDict {
+                        if let timestamp = value as? Timestamp {
+                            chatClearedAt[key] = timestamp.dateValue()
+                        }
+                    }
+                }
                 
                 self.currentRelationship = Relationship(
                     id: snapshot?.documentID,
@@ -123,7 +131,8 @@ class RelationshipService: ObservableObject {
                     user2Name: data["user2Name"] as? String ?? "",
                     startDate: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
                     createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
-                    themeColor: data["themeColor"] as? String
+                    themeColor: data["themeColor"] as? String,
+                    chatClearedAt: chatClearedAt.isEmpty ? nil : chatClearedAt
                 )
             }
     }
@@ -154,4 +163,3 @@ class RelationshipService: ObservableObject {
         invitationListener?.remove()
     }
 }
-
