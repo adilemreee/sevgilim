@@ -22,6 +22,7 @@ class MovieService: ObservableObject {
         // Optimized query with limit
         listener = db.collection("movies")
             .whereField("relationshipId", isEqualTo: relationshipId)
+            .order(by: "watchedDate", descending: true)
             .limit(to: 100) // Limit to 100 movies
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
@@ -99,4 +100,3 @@ class MovieService: ObservableObject {
         listener?.remove()
     }
 }
-

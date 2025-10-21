@@ -23,6 +23,7 @@ class MemoryService: ObservableObject {
         // Optimized query: limit results for faster loading
         listener = db.collection("memories")
             .whereField("relationshipId", isEqualTo: relationshipId)
+            .order(by: "date", descending: true)
             .limit(to: memoriesLimit)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
@@ -137,4 +138,3 @@ class MemoryService: ObservableObject {
         listener?.remove()
     }
 }
-

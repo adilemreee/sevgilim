@@ -6,5 +6,9 @@
 	<string>ebb22c9c8dd9465b95c93902edb083c6</string>
 	<key>SpotifyClientSecret</key>
 	<string>0d3b4d9106c44439936fc08a470ace81</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

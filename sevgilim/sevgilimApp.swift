@@ -5,6 +5,9 @@
 
 import SwiftUI
 import FirebaseCore
+import FirebaseAuth
+import FirebaseMessaging
+import UserNotifications
 
 @main
 struct sevgilimApp: App {
@@ -53,20 +56,85 @@ struct sevgilimApp: App {
 }
 
 // MARK: - App Delegate
-class AppDelegate: NSObject, UIApplicationDelegate {
+class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil
     ) -> Bool {
         // Configure Firebase
         FirebaseApp.configure()
-        
-        
-        
-        
+
+        UNUserNotificationCenter.current().delegate = self
+        Messaging.messaging().delegate = self
+        requestNotificationPermissions(for: application)
+        PushNotificationManager.shared.refreshIfNeeded()
+
         return true
     }
-    
 
-    
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Messaging.messaging().apnsToken = deviceToken
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        print("❌ APNs kayıt hatası: \(error.localizedDescription)")
+    }
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        PushNotificationManager.shared.syncTokenWithCurrentUser()
+    }
+
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        guard let token = fcmToken else { return }
+        PushNotificationManager.shared.updateFCMToken(token)
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .list, .sound, .badge])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        NotificationCenter.default.post(
+            name: .didReceiveRemoteNotification,
+            object: nil,
+            userInfo: response.notification.request.content.userInfo
+        )
+        completionHandler()
+    }
+
+    private func requestNotificationPermissions(for application: UIApplication) {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+            if let error = error {
+                print("❌ Bildirim izni hatası: \(error.localizedDescription)")
+                return
+            }
+
+            guard granted else {
+                print("ℹ️ Kullanıcı bildirim izni vermedi.")
+                return
+            }
+
+            DispatchQueue.main.async {
+                application.registerForRemoteNotifications()
+            }
+        }
+    }
+}
+
+extension Notification.Name {
+    static let didReceiveRemoteNotification = Notification.Name("didReceiveRemoteNotification")
 }

@@ -13,6 +13,7 @@ struct User: Identifiable, Codable {
     var profileImageURL: String?
     var relationshipId: String?
     var createdAt: Date
+    var fcmTokens: [String]?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -21,6 +22,6 @@ struct User: Identifiable, Codable {
         case profileImageURL
         case relationshipId
         case createdAt
+        case fcmTokens
     }
 }
-

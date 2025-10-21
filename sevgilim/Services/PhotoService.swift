@@ -23,6 +23,7 @@ class PhotoService: ObservableObject {
         // Optimized query: limit results for faster loading
         listener = db.collection("photos")
             .whereField("relationshipId", isEqualTo: relationshipId)
+            .order(by: "date", descending: true)
             .limit(to: photosLimit)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
@@ -105,4 +106,3 @@ class PhotoService: ObservableObject {
         listener?.remove()
     }
 }
-

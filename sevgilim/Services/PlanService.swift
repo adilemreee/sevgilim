@@ -22,6 +22,7 @@ class PlanService: ObservableObject {
         // Optimized query with limit
         listener = db.collection("plans")
             .whereField("relationshipId", isEqualTo: relationshipId)
+            .order(by: "createdAt", descending: true)
             .limit(to: 50) // Limit to 50 plans
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
@@ -114,4 +115,3 @@ class PlanService: ObservableObject {
         listener?.remove()
     }
 }
-

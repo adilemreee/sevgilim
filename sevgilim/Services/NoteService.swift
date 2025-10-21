@@ -22,6 +22,7 @@ class NoteService: ObservableObject {
         // Optimized query with limit for better performance
         listener = db.collection("notes")
             .whereField("relationshipId", isEqualTo: relationshipId)
+            .order(by: "updatedAt", descending: true)
             .limit(to: 50) // Limit to 50 notes
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
@@ -95,4 +96,3 @@ class NoteService: ObservableObject {
         listener?.remove()
     }
 }
-

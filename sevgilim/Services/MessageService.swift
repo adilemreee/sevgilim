@@ -35,6 +35,7 @@ class MessageService: ObservableObject {
         // Load recent messages only for better performance
         messagesListener = db.collection("messages")
             .whereField("relationshipId", isEqualTo: relationshipId)
+            .order(by: "timestamp", descending: true)
             .limit(to: 100) // Load last 100 messages
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
@@ -294,6 +295,7 @@ class MessageService: ObservableObject {
             .whereField("relationshipId", isEqualTo: relationshipId)
             .whereField("isRead", isEqualTo: false)
             .whereField("senderId", isNotEqualTo: currentUserId) // <-- ÖNEMLİ: Kendi mesajlarımızı saymamak için
+            .order(by: "senderId")
             .addSnapshotListener { [weak self] snapshot, error in
                 if let error = error {
                     print("❌ Error listening to unread message count: \(error.localizedDescription)")

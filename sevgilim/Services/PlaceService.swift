@@ -23,6 +23,7 @@ class PlaceService: ObservableObject {
         // Optimized query: limit results for faster loading
         listener = db.collection("places")
             .whereField("relationshipId", isEqualTo: relationshipId)
+            .order(by: "date", descending: true)
             .limit(to: placesLimit)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }

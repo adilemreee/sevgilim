@@ -35,18 +35,21 @@ class AuthenticationService: ObservableObject {
                 name: name,
                 profileImageURL: nil,
                 relationshipId: nil,
-                createdAt: Date()
+                createdAt: Date(),
+                fcmTokens: []
             )
             
             try await db.collection("users").document(result.user.uid).setData([
                 "email": email,
                 "name": name,
-                "createdAt": Timestamp(date: Date())
+                "createdAt": Timestamp(date: Date()),
+                "fcmTokens": []
             ])
             
             await MainActor.run {
                 self.currentUser = newUser
                 self.isAuthenticated = true
+                PushNotificationManager.shared.syncTokenWithCurrentUser()
             }
         } catch {
             await MainActor.run {
@@ -70,6 +73,7 @@ class AuthenticationService: ObservableObject {
     
     func signOut() {
         do {
+            PushNotificationManager.shared.unregisterCurrentToken()
             try Auth.auth().signOut()
             currentUser = nil
             isAuthenticated = false
@@ -81,7 +85,9 @@ class AuthenticationService: ObservableObject {
     func fetchUserData(userId: String) {
         db.collection("users").document(userId).getDocument { snapshot, error in
             if let error = error {
-                self.errorMessage = error.localizedDescription
+                Task { @MainActor in
+                    self.errorMessage = error.localizedDescription
+                }
                 return
             }
             
@@ -93,11 +99,15 @@ class AuthenticationService: ObservableObject {
                 name: data["name"] as? String ?? "",
                 profileImageURL: data["profileImageURL"] as? String,
                 relationshipId: data["relationshipId"] as? String,
-                createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+                createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
+                fcmTokens: data["fcmTokens"] as? [String]
             )
             
-            self.currentUser = user
-            self.isAuthenticated = true
+            Task { @MainActor in
+                self.currentUser = user
+                self.isAuthenticated = true
+                PushNotificationManager.shared.syncTokenWithCurrentUser()
+            }
         }
     }
     
