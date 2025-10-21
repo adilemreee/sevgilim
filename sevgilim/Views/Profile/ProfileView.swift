@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 struct ProfileView: View {
     @EnvironmentObject var authService: AuthenticationService
@@ -361,6 +362,7 @@ struct SettingsView: View {
     
     @State private var showingDeleteAccountAlert = false
     @State private var showingClearCacheAlert = false
+    @State private var showingNotificationSettings = false
     @State private var cacheCleared = false
     
     var body: some View {
@@ -408,6 +410,40 @@ struct SettingsView: View {
                         
                         // Settings Items
                         VStack(spacing: 16) {
+                            // Notification Settings
+                            Button(action: { showingNotificationSettings = true }) {
+                                HStack(spacing: 15) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.purple.opacity(0.2))
+                                            .frame(width: 50, height: 50)
+                                        
+                                        Image(systemName: "bell.fill")
+                                            .font(.title3)
+                                            .foregroundColor(.purple)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Bildirim Ayarları")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.primary)
+                                        
+                                        Text("Push bildirimleri ve izinler")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary.opacity(0.5))
+                                }
+                                .padding(16)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                            }
+                            
                             // Clear Cache
                             Button(action: { showingClearCacheAlert = true }) {
                                 HStack(spacing: 15) {
@@ -553,8 +589,164 @@ struct SettingsView: View {
             } message: {
                 Text("⚠️ Hesabınız ve tüm verileriniz kalıcı olarak silinecek. Bu işlem geri alınamaz!")
             }
+            .sheet(isPresented: $showingNotificationSettings) {
+                NotificationSettingsView()
+            }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+    }
+}
+
+// MARK: - Notification Settings View
+struct NotificationSettingsView: View {
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    @State private var pushEnabled = PushNotificationManager.shared.notificationsEnabled
+    @State private var permissionStatus: UNAuthorizationStatus = .notDetermined
+    @State private var permissionMessage: String?
+    
+    @AppStorage("notifyChatAlerts") private var chatAlertsEnabled = true
+    @AppStorage("notifyMemoryAlerts") private var memoryAlertsEnabled = true
+    @AppStorage("notifyPlanAlerts") private var planAlertsEnabled = true
+    @AppStorage("notifySpecialDayAlerts") private var specialDayAlertsEnabled = true
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Push Bildirimleri")) {
+                    Toggle(isOn: $pushEnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Push bildirimlerini aç")
+                            Text(statusText(for: permissionStatus))
+                                .font(.caption)
+                                .foregroundColor(statusColor(for: permissionStatus))
+                        }
+                    }
+                    .onChange(of: pushEnabled, perform: handlePushToggle)
+                    
+                    if let permissionMessage {
+                        Text(permissionMessage)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                    
+                    Button {
+                        openSystemSettings()
+                    } label: {
+                        Label("Bildirim izinlerini iOS Ayarlarında yönet", systemImage: "gearshape.arrow.triangle.2.circlepath")
+                    }
+                }
+                
+                Section(header: Text("Bildirim Kategorileri")) {
+                    Toggle("Sohbet bildirimleri", isOn: $chatAlertsEnabled)
+                    Toggle("Anı güncellemeleri", isOn: $memoryAlertsEnabled)
+                    Toggle("Plan hatırlatmaları", isOn: $planAlertsEnabled)
+                    Toggle("Özel gün hatırlatmaları", isOn: $specialDayAlertsEnabled)
+                }
+                .tint(themeManager.currentTheme.primaryColor)
+                
+                Section(footer: Text("Bu tercihler sadece uygulama içi davranış için saklanır. Push bildirim türlerine göre filtrelemek için arka uçla entegre etmeniz gerekir.")) {
+                    EmptyView()
+                }
+            }
+            .navigationTitle("Bildirim Ayarları")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Kapat") { dismiss() }
+                }
+            }
+            .tint(themeManager.currentTheme.primaryColor)
+            .task {
+                await refreshAuthorizationStatus()
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification),
+                perform: { _ in
+                    Task {
+                        await refreshAuthorizationStatus()
+                    }
+                }
+            )
+        }
+        .navigationViewStyle(StackNavigationViewStyle())
+    }
+    
+    private func handlePushToggle(_ isEnabled: Bool) {
+        if isEnabled {
+            switch permissionStatus {
+            case .denied:
+                permissionMessage = "Bildirim izni kapalı. Ayarlar > Bildirimler bölümünden açabilirsiniz."
+                pushEnabled = false
+                PushNotificationManager.shared.setNotificationsEnabled(false)
+                openSystemSettings()
+            case .notDetermined:
+                requestAuthorization { granted in
+                    DispatchQueue.main.async {
+                        if granted {
+                            permissionMessage = nil
+                            PushNotificationManager.shared.setNotificationsEnabled(true)
+                            Task { await refreshAuthorizationStatus() }
+                        } else {
+                            pushEnabled = false
+                            permissionMessage = "Bildirim izni verilmedi."
+                            PushNotificationManager.shared.setNotificationsEnabled(false)
+                        }
+                    }
+                }
+            default:
+                permissionMessage = nil
+                PushNotificationManager.shared.setNotificationsEnabled(true)
+            }
+        } else {
+            permissionMessage = nil
+            PushNotificationManager.shared.setNotificationsEnabled(false)
+        }
+    }
+    
+    private func requestAuthorization(completion: @escaping (Bool) -> Void) {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+            completion(granted)
+        }
+    }
+    
+    @MainActor
+    private func refreshAuthorizationStatus() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        permissionStatus = settings.authorizationStatus
+    }
+    
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString),
+              UIApplication.shared.canOpenURL(url) else { return }
+        UIApplication.shared.open(url)
+    }
+    
+    private func statusText(for status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .authorized, .provisional, .ephemeral:
+            return "Bildirim izni açık"
+        case .denied:
+            return "Bildirim izni kapalı"
+        case .notDetermined:
+            return "İzin henüz sorulmadı"
+        @unknown default:
+            return "Bilinmeyen durum"
+        }
+    }
+    
+    private func statusColor(for status: UNAuthorizationStatus) -> Color {
+        switch status {
+        case .authorized, .provisional, .ephemeral:
+            return .green
+        case .denied:
+            return .red
+        case .notDetermined:
+            return .orange
+        @unknown default:
+            return .secondary
+        }
     }
 }
 
@@ -1273,4 +1465,3 @@ struct CompactSettingsRow: View {
         }
     }
 }
-

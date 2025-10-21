@@ -100,6 +100,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        updateBadge(using: notification.request.content.userInfo)
         completionHandler([.banner, .list, .sound, .badge])
     }
 
@@ -108,6 +109,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
+        updateBadge(using: response.notification.request.content.userInfo)
         NotificationCenter.default.post(
             name: .didReceiveRemoteNotification,
             object: nil,
@@ -130,6 +132,28 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 
             DispatchQueue.main.async {
                 application.registerForRemoteNotifications()
+            }
+        }
+    }
+    
+    private func updateBadge(using userInfo: [AnyHashable: Any]) {
+        let updateBlock = {
+            let application = UIApplication.shared
+            
+            if let aps = userInfo["aps"] as? [String: Any],
+               let badgeValue = aps["badge"] as? Int {
+                application.applicationIconBadgeNumber = badgeValue
+            } else {
+                let newValue = max(application.applicationIconBadgeNumber + 1, 1)
+                application.applicationIconBadgeNumber = newValue
+            }
+        }
+        
+        if Thread.isMainThread {
+            updateBlock()
+        } else {
+            DispatchQueue.main.async {
+                updateBlock()
             }
         }
     }

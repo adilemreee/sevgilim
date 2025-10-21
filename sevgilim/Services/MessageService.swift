@@ -15,6 +15,8 @@ class MessageService: ObservableObject {
     @Published var partnerIsTyping: Bool = false
     @Published var unreadMessageCount: Int = 0
     
+    private let messagesLimit = 100
+    
     enum MessageDeletionScope {
         case me
         case everyone
@@ -31,31 +33,15 @@ class MessageService: ObservableObject {
     func listenToMessages(relationshipId: String , currentUserId : String) {
         // Remove existing listener if any
         messagesListener?.remove()
-        
-        // Load recent messages only for better performance
-        messagesListener = db.collection("messages")
+
+        let baseQuery = db.collection("messages")
             .whereField("relationshipId", isEqualTo: relationshipId)
-            .order(by: "timestamp", descending: true)
-            .limit(to: 100) // Load last 100 messages
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let self = self else { return }
-                
-                if let error = error {
-                    print("❌ Error listening to messages: \(error.localizedDescription)")
-                    return
-                }
-                
-                guard let documents = snapshot?.documents else {
-                    return
-                }
-                
-                self.messages = documents.compactMap { document in
-                    try? document.data(as: Message.self)
-                }
-                
-                // Client-side sorting by timestamp (newest at bottom)
-                self.messages.sort { $0.timestamp < $1.timestamp }
-            }
+        
+        let orderedQuery = baseQuery
+            .order(by: "timestamp")
+            .limit(toLast: messagesLimit)
+        
+        startMessagesListener(primaryQuery: orderedQuery, fallbackQuery: baseQuery, allowFallback: true)
     }
     
     // MARK: - Listen to Typing Indicator
@@ -351,5 +337,43 @@ class MessageService: ObservableObject {
         typingListener?.remove()
         unreadCountListener?.remove()
         typingTimer?.invalidate()
+    }
+
+    // MARK: - Private Helpers
+    private func startMessagesListener(primaryQuery: Query, fallbackQuery: Query?, allowFallback: Bool) {
+        messagesListener = primaryQuery.addSnapshotListener { [weak self] snapshot, error in
+            guard let self = self else { return }
+
+            if let error = error {
+                if allowFallback,
+                   let fallbackQuery,
+                   let nsError = error as NSError?,
+                   nsError.domain == FirestoreErrorDomain,
+                   nsError.code == FirestoreErrorCode.failedPrecondition.rawValue {
+                    print("⚠️ Mesaj sorgusu için Firestore index eksik: \(error.localizedDescription). Yedek sorguya geçiliyor.")
+                    self.messagesListener?.remove()
+                    self.startMessagesListener(primaryQuery: fallbackQuery, fallbackQuery: nil, allowFallback: false)
+                } else {
+                    print("❌ Error listening to messages: \(error.localizedDescription)")
+                }
+                return
+            }
+
+            guard let documents = snapshot?.documents else {
+                return
+            }
+
+            var fetchedMessages = documents.compactMap { document in
+                try? document.data(as: Message.self)
+            }
+
+            fetchedMessages.sort { $0.timestamp < $1.timestamp }
+
+            if fetchedMessages.count > self.messagesLimit {
+                fetchedMessages = Array(fetchedMessages.suffix(self.messagesLimit))
+            }
+
+            self.messages = fetchedMessages
+        }
     }
 }

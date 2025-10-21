@@ -13,6 +13,7 @@ final class PushNotificationManager {
 
     private let db = Firestore.firestore()
     private let tokenDefaultsKey = "cachedFCMToken"
+    private let notificationsEnabledKey = "pushNotificationsEnabled"
     private let queue = DispatchQueue(label: "PushNotificationManager.queue")
 
     private init() {}
@@ -26,6 +27,13 @@ final class PushNotificationManager {
                 UserDefaults.standard.removeObject(forKey: tokenDefaultsKey)
             }
         }
+    }
+    
+    var notificationsEnabled: Bool {
+        if UserDefaults.standard.object(forKey: notificationsEnabledKey) == nil {
+            return true
+        }
+        return UserDefaults.standard.bool(forKey: notificationsEnabledKey)
     }
 
     func updateFCMToken(_ token: String) {
@@ -41,6 +49,10 @@ final class PushNotificationManager {
 
             self.cachedToken = token
 
+            if !self.notificationsEnabled {
+                return
+            }
+
             if let previousToken {
                 self.removeTokenFromCurrentUser(previousToken)
             }
@@ -50,6 +62,8 @@ final class PushNotificationManager {
     }
 
     func refreshIfNeeded() {
+        guard notificationsEnabled else { return }
+
         Messaging.messaging().token { [weak self] token, error in
             if let error = error {
                 print("❌ FCM token alınamadı: \(error.localizedDescription)")
@@ -62,6 +76,7 @@ final class PushNotificationManager {
     }
 
     func syncTokenWithCurrentUser() {
+        guard notificationsEnabled else { return }
         guard let token = cachedToken,
               let userId = Auth.auth().currentUser?.uid else { return }
 
@@ -86,6 +101,7 @@ final class PushNotificationManager {
                 try await db.collection("users").document(userId).updateData([
                     "fcmTokens": FieldValue.arrayRemove([token])
                 ])
+                self.cachedToken = nil
             } catch {
                 print("❌ FCM token silinemedi: \(error.localizedDescription)")
             }
@@ -102,6 +118,18 @@ final class PushNotificationManager {
                 ])
             } catch {
                 print("❌ Eski FCM token kaldırılamadı: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    func setNotificationsEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: notificationsEnabledKey)
+        
+        queue.async {
+            if enabled {
+                self.refreshIfNeeded()
+            } else {
+                self.unregisterCurrentToken()
             }
         }
     }

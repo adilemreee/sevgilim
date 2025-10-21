@@ -175,6 +175,38 @@ struct MemoriesView: View {
 struct MemoryCardModern: View {
     let memory: Memory
     @EnvironmentObject var themeManager: ThemeManager
+    @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject var memoryService: MemoryService
+    
+    @State private var isProcessingLike = false
+    
+    private var isLiked: Bool {
+        guard let userId = authService.currentUser?.id else { return false }
+        return memory.likes.contains(userId)
+    }
+    
+    private var likeCountText: String {
+        memory.likes.count == 0 ? "Beğeni yok" : "\(memory.likes.count)"
+    }
+    
+    private var commentCountText: String {
+        memory.comments.count == 0 ? "Yorum yok" : "\(memory.comments.count)"
+    }
+    
+    private func toggleLike() {
+        guard !isProcessingLike,
+              let userId = authService.currentUser?.id else { return }
+        
+        isProcessingLike = true
+        Task {
+            defer { Task { @MainActor in self.isProcessingLike = false } }
+            do {
+                try await memoryService.toggleLike(memory: memory, userId: userId)
+            } catch {
+                print("❌ Memory like toggle failed: \(error.localizedDescription)")
+            }
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -263,24 +295,56 @@ struct MemoryCardModern: View {
             }
             
             // Quick Stats
-            HStack(spacing: 20) {
-                HStack(spacing: 5) {
-                    Image(systemName: "heart.fill")
-                        .font(.caption)
-                        .foregroundColor(themeManager.currentTheme.primaryColor)
-                    Text("\(memory.likes.count)")
+            HStack(spacing: 24) {
+                Button(action: toggleLike) {
+                    HStack(spacing: 6) {
+                        Image(systemName: isLiked ? "heart.fill" : "heart")
+                            .font(.subheadline)
+                            .foregroundStyle(isLiked ? themeManager.currentTheme.primaryColor : .secondary)
+                        Text(likeCountText)
+                            .font(.caption)
+                            .foregroundStyle(isLiked ? themeManager.currentTheme.primaryColor : .secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isProcessingLike)
+                
+                HStack(spacing: 6) {
+                    Image(systemName: "text.bubble")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text(commentCountText)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 
-                HStack(spacing: 5) {
-                    Image(systemName: "bubble.left.fill")
+                Spacer()
+            }
+            
+            if let firstComment = memory.comments.first {
+                Divider()
+                    .padding(.vertical, 4)
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text(firstComment.userName)
+                            .font(.caption.bold())
+                            .foregroundColor(themeManager.currentTheme.primaryColor)
+                        Text(firstComment.createdAt.timeAgo())
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    Text(firstComment.text)
                         .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("\(memory.comments.count)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
                 }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(themeManager.currentTheme.primaryColor.opacity(0.08))
+                )
             }
         }
         .padding(16)
@@ -300,6 +364,8 @@ struct MemoryDetailView: View {
     @State private var showingDeleteAlert = false
     @State private var showingComments = false
     @State private var commentText = ""
+    @State private var isSubmittingComment = false
+    @State private var commentError: String?
     
     // Get current memory from service for live updates
     private var currentMemory: Memory {
@@ -411,6 +477,12 @@ struct MemoryDetailView: View {
                             Text("Yorumlar")
                                 .font(.headline)
                             
+                            if let commentError {
+                                Text(commentError)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                            
                             if currentMemory.comments.isEmpty {
                                 Text("Henüz yorum yok")
                                     .font(.caption)
@@ -419,36 +491,50 @@ struct MemoryDetailView: View {
                                     .padding()
                             } else {
                                 ForEach(currentMemory.comments) { comment in
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        HStack {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack(spacing: 8) {
                                             Text(comment.userName)
                                                 .font(.caption.bold())
+                                                .foregroundColor(themeManager.currentTheme.primaryColor)
                                             Text(comment.createdAt.timeAgo())
                                                 .font(.caption2)
                                                 .foregroundColor(.secondary)
                                         }
                                         Text(comment.text)
                                             .font(.caption)
+                                            .foregroundColor(.primary)
                                     }
-                                    .padding(10)
+                                    .padding(12)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(themeManager.currentTheme.primaryColor.opacity(0.08))
+                                    )
                                 }
                             }
                             
                             // Add Comment
-                            HStack {
-                                TextField("Yorum ekle...", text: $commentText)
+                            HStack(spacing: 12) {
+                                TextField("Yorum ekle...", text: $commentText, axis: .vertical)
+                                    .lineLimit(1...4)
                                     .textFieldStyle(.roundedBorder)
+                                    .submitLabel(.send)
+                                    .onSubmit(addComment)
                                 
                                 Button(action: addComment) {
-                                    Image(systemName: "arrow.up.circle.fill")
-                                        .font(.title2)
-                                        .foregroundStyle(themeManager.currentTheme.primaryColor)
+                                    if isSubmittingComment {
+                                        ProgressView()
+                                            .progressViewStyle(.circular)
+                                    } else {
+                                        Image(systemName: "paperplane.fill")
+                                            .font(.title3)
+                                            .foregroundStyle(themeManager.currentTheme.primaryColor)
+                                    }
                                 }
-                                .disabled(commentText.isEmpty)
+                                .buttonStyle(.plain)
+                                .disabled(isSubmittingComment || trimmedCommentText().isEmpty)
                             }
+                            .padding(.top, 4)
                         }
                     }
                 }
@@ -493,21 +579,47 @@ struct MemoryDetailView: View {
         }
     }
     
+    private func trimmedCommentText() -> String {
+        commentText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
     private func addComment() {
-        guard let userId = authService.currentUser?.id,
+        let text = trimmedCommentText()
+        guard !text.isEmpty else {
+            commentError = "Yorum boş bırakılamaz."
+            return
+        }
+        
+        guard !isSubmittingComment,
+              let userId = authService.currentUser?.id,
               let userName = authService.currentUser?.name else { return }
         
         let comment = Comment(
             userId: userId,
             userName: userName,
-            text: commentText,
+            text: text,
             createdAt: Date()
         )
         
         Task {
-            try? await memoryService.addComment(memory: currentMemory, comment: comment)
             await MainActor.run {
-                commentText = ""
+                isSubmittingComment = true
+                commentError = nil
+            }
+            
+            do {
+                try await memoryService.addComment(memory: currentMemory, comment: comment)
+                await MainActor.run {
+                    commentText = ""
+                }
+            } catch {
+                await MainActor.run {
+                    commentError = "Yorum eklenemedi: \(error.localizedDescription)"
+                }
+            }
+            
+            await MainActor.run {
+                isSubmittingComment = false
             }
         }
     }
