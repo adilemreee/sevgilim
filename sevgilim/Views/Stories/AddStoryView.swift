@@ -13,6 +13,10 @@ struct AddStoryView: View {
     @EnvironmentObject var themeManager: ThemeManager
     
     @State private var selectedImage: UIImage?
+    @State private var stagedImage: UIImage?
+    @State private var showingStoryEditor = false
+    @State private var editorImage: UIImage?
+    @State private var editingExistingImage = false
     @State private var showingImagePicker = false
     @State private var showingCamera = false
     @State private var showingSourceOptions = false
@@ -75,6 +79,19 @@ struct AddStoryView: View {
                                 // Change Photo Button
                                 VStack {
                                     HStack {
+                                        if #available(iOS 16.0, *) {
+                                            Button(action: reopenEditor) {
+                                                Image(systemName: "pencil.tip.crop.circle")
+                                                    .font(.system(size: 18))
+                                                    .foregroundColor(.white)
+                                                    .frame(width: 40, height: 40)
+                                                    .background(.ultraThinMaterial)
+                                                    .clipShape(Circle())
+                                            }
+                                            .padding(12)
+                                            .disabled(uploadState.isUploading)
+                                        }
+                                        
                                         Spacer()
                                         
                                         Button(action: { showingSourceOptions = true }) {
@@ -86,6 +103,7 @@ struct AddStoryView: View {
                                                 .clipShape(Circle())
                                         }
                                         .padding(12)
+                                        .disabled(uploadState.isUploading)
                                     }
                                     
                                     Spacer()
@@ -198,14 +216,32 @@ struct AddStoryView: View {
                 }
             }
             .sheet(isPresented: $showingImagePicker) {
-                ImagePicker(image: $selectedImage)
+                ImagePicker(image: $stagedImage)
             }
             .fullScreenCover(isPresented: $showingCamera) {
                 ZStack {
                     Color.black
                         .ignoresSafeArea()
-                    CameraPicker(image: $selectedImage)
+                    CameraPicker(image: $stagedImage)
                         .ignoresSafeArea()
+                }
+            }
+            .fullScreenCover(isPresented: $showingStoryEditor) {
+                if let imageToEdit = editorImage {
+                    if #available(iOS 16.0, *) {
+                        StoryEditorView(
+                            image: imageToEdit,
+                            onCancel: handleEditorCancel,
+                            onSave: handleEditorSave
+                        )
+                    } else {
+                        StoryEditorUnavailableView(onDismiss: handleEditorCancel)
+                    }
+                } else {
+                    EmptyView()
+                        .onAppear {
+                            handleEditorCancel()
+                        }
                 }
             }
             .confirmationDialog("Fotoğraf Seç", isPresented: $showingSourceOptions) {
@@ -229,8 +265,48 @@ struct AddStoryView: View {
             } message: {
                 Text(uploadState.errorMessage ?? "")
             }
+            .onChange(of: stagedImage) { newValue in
+                guard let image = newValue else { return }
+                if #available(iOS 16.0, *) {
+                    beginEditing(with: image, existing: false)
+                } else {
+                    selectedImage = image
+                }
+                stagedImage = nil
+            }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+    }
+    
+    // MARK: - Story Editing
+    private func beginEditing(with image: UIImage, existing: Bool) {
+        editorImage = image
+        editingExistingImage = existing
+        showingStoryEditor = true
+    }
+    
+    private func reopenEditor() {
+        guard let currentImage = selectedImage else { return }
+        guard #available(iOS 16.0, *) else { return }
+        beginEditing(with: currentImage, existing: true)
+    }
+    
+    private func handleEditorCancel() {
+        if !editingExistingImage {
+            selectedImage = nil
+        }
+        editorImage = nil
+        stagedImage = nil
+        showingStoryEditor = false
+        editingExistingImage = false
+    }
+    
+    private func handleEditorSave(_ editedImage: UIImage) {
+        selectedImage = editedImage
+        editorImage = nil
+        stagedImage = nil
+        showingStoryEditor = false
+        editingExistingImage = false
     }
     
     // MARK: - Upload Story
@@ -264,6 +340,40 @@ struct AddStoryView: View {
                     uploadState.fail(with: "Story yüklenirken hata oluştu: \(error.localizedDescription)")
                 }
             }
+        }
+    }
+}
+
+private struct StoryEditorUnavailableView: View {
+    let onDismiss: () -> Void
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.92)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(.yellow)
+                
+                Text("Story düzenleme bu iOS sürümünde desteklenmiyor.")
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.white)
+                    .padding(.horizontal)
+                
+                Button(action: onDismiss) {
+                    Text("Kapat")
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 12)
+                        .background(Color.white.opacity(0.15))
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                }
+            }
+            .padding()
         }
     }
 }
