@@ -32,6 +32,7 @@ struct HomeView: View {
     @State private var navigateToSurprises = false
     @State private var navigateToSpecialDays = false
     @State private var showingNotifications = false
+    @State private var showingVault = false
     
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     
@@ -169,7 +170,8 @@ struct HomeView: View {
                     onPlacesSelected: { navigateWithDelay(to: $navigateToPlaces) },
                     onSongsSelected: { navigateWithDelay(to: $navigateToSongs) },
                     onSurprisesSelected: { navigateWithDelay(to: $navigateToSurprises) },
-                    onSpecialDaysSelected: { navigateWithDelay(to: $navigateToSpecialDays) }
+                    onSpecialDaysSelected: { navigateWithDelay(to: $navigateToSpecialDays) },
+                    
                 )
                 .presentationDetents([.height(600)])
                 .presentationDragIndicator(.visible)
@@ -179,6 +181,7 @@ struct HomeView: View {
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
+         
             
             // Timer & Lifecycle
             .onReceive(timer) { _ in
@@ -199,5 +202,7 @@ struct HomeView: View {
             binding.wrappedValue = true
         }
     }
+    
+
     
 }

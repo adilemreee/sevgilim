@@ -122,7 +122,7 @@ struct ProfileHeaderCard: View {
         VStack(spacing: 20) {
             // Profile Image with Caching
             if let urlString = profileImageURL {
-                CachedAsyncImage(url: urlString, thumbnail: true) { image in
+                CachedAsyncImage(url: urlString, thumbnail: true) { image, _ in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -817,7 +817,7 @@ struct EditProfileView: View {
                                     .frame(width: 120, height: 120)
                                     .clipShape(Circle())
                             } else if let profileURL = authService.currentUser?.profileImageURL {
-                                CachedAsyncImage(url: profileURL, thumbnail: true) { image in
+                                CachedAsyncImage(url: profileURL, thumbnail: true) { image, _ in
                                     image
                                         .resizable()
                                         .aspectRatio(contentMode: .fill)
@@ -1239,7 +1239,7 @@ struct CompactProfileView: View {
                     HStack(spacing: 15) {
                         // Profile Image with Caching
                         if let urlString = authService.currentUser?.profileImageURL {
-                            CachedAsyncImage(url: urlString, thumbnail: true) { image in
+                            CachedAsyncImage(url: urlString, thumbnail: true) { image, _ in
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)

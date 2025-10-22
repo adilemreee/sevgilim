@@ -11,6 +11,7 @@ struct LoginView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var showingRegister = false
+    @State private var showingForgotPassword = false
     @State private var isLoading = false
     @State private var showError = false
     
@@ -55,6 +56,13 @@ struct LoginView: View {
                     SecureField("Şifre", text: $password)
                         .textFieldStyle(CustomTextFieldStyle())
                     
+                    Button(action: { showingForgotPassword = true }) {
+                        Text("Şifreni mi unuttun?")
+                            .font(.footnote)
+                            .foregroundColor(themeManager.currentTheme.primaryColor)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    
                     Button(action: login) {
                         if isLoading {
                             ProgressView()
@@ -91,6 +99,9 @@ struct LoginView: View {
         .sheet(isPresented: $showingRegister) {
             RegisterView()
         }
+        .sheet(isPresented: $showingForgotPassword) {
+            ForgotPasswordView()
+        }
     }
     
     private func login() {
@@ -123,4 +134,3 @@ struct CustomTextFieldStyle: TextFieldStyle {
             .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
-

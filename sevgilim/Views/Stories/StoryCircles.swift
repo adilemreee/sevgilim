@@ -260,7 +260,7 @@ private struct StoryImageView: View {
     
     var body: some View {
         if let urlString = imageURL ?? fallbackURL {
-            CachedAsyncImage(url: urlString, thumbnail: true) { image in
+            CachedAsyncImage(url: urlString, thumbnail: true) { image, _ in
                 image
                     .resizable()
                     .scaledToFill()

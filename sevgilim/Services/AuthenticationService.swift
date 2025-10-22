@@ -82,6 +82,20 @@ class AuthenticationService: ObservableObject {
         }
     }
     
+    func sendPasswordReset(email: String) async throws {
+        do {
+            try await Auth.auth().sendPasswordReset(withEmail: email)
+            await MainActor.run {
+                self.errorMessage = nil
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+            }
+            throw error
+        }
+    }
+    
     func fetchUserData(userId: String) {
         db.collection("users").document(userId).getDocument { snapshot, error in
             if let error = error {

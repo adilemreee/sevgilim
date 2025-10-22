@@ -686,7 +686,7 @@ struct MessageBubble: View {
     @ViewBuilder
     private func storyPreview(url: String) -> some View {
         HStack(spacing: 8) {
-            CachedAsyncImage(url: url, thumbnail: true) { image in
+            CachedAsyncImage(url: url, thumbnail: true) { image, _ in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -789,7 +789,7 @@ struct MessageImageView: View {
     
     var body: some View {
         ZStack {
-            CachedAsyncImage(url: imageURL, thumbnail: true) { image in
+            CachedAsyncImage(url: imageURL, thumbnail: true) { image, _ in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)

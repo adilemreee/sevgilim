@@ -177,7 +177,7 @@ import SwiftUI
 struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     let url: String
     let thumbnail: Bool
-    @ViewBuilder let content: (Image) -> Content
+    @ViewBuilder let content: (Image, CGSize) -> Content
     @ViewBuilder let placeholder: () -> Placeholder
     
     @State private var loadedImage: UIImage?
@@ -187,7 +187,7 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     init(
         url: String,
         thumbnail: Bool = false,
-        @ViewBuilder content: @escaping (Image) -> Content,
+        @ViewBuilder content: @escaping (Image, CGSize) -> Content,
         @ViewBuilder placeholder: @escaping () -> Placeholder
     ) {
         self.url = url
@@ -199,7 +199,7 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     var body: some View {
         Group {
             if let image = loadedImage {
-                content(Image(uiImage: image))
+                content(Image(uiImage: image), image.size)
             } else if isLoading {
                 placeholder()
             } else {
@@ -234,4 +234,3 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
         }
     }
 }
-

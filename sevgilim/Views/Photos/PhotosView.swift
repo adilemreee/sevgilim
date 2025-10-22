@@ -267,10 +267,14 @@ struct PhotoCardModern: View {
     var body: some View {
         VStack(alignment: .leading, spacing: style.showsDetails ? 12 : 0) {
             ZStack(alignment: .topLeading) {
-                CachedAsyncImage(url: photo.imageURL, thumbnail: true) { image in
+                CachedAsyncImage(url: photo.imageURL, thumbnail: true) { image, size in
+                    let isLandscape = size.width > size.height && size.width > 0 && size.height > 0
+                    
                     image
                         .resizable()
-                        .scaledToFill()
+                        .aspectRatio(contentMode: isLandscape ? .fit : .fill)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black.opacity(isLandscape ? 0.18 : 0))
                 } placeholder: {
                     ZStack {
                         LinearGradient(
@@ -287,7 +291,6 @@ struct PhotoCardModern: View {
                 }
                 .frame(height: style.tileHeight)
                 .frame(maxWidth: .infinity)
-                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)

@@ -248,7 +248,7 @@ struct MemoryCardModern: View {
             
             // Photo with Caching (Thumbnail)
             if let photoURL = memory.photoURL {
-                CachedAsyncImage(url: photoURL, thumbnail: true) { image in
+                CachedAsyncImage(url: photoURL, thumbnail: true) { image, _ in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -378,7 +378,7 @@ struct MemoryDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     // Photo
                     if let photoURL = currentMemory.photoURL {
-                        CachedAsyncImage(url: photoURL, thumbnail: false) { image in
+                        CachedAsyncImage(url: photoURL, thumbnail: false) { image, _ in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)

@@ -337,7 +337,7 @@ private struct NotificationRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             
             if let thumbnailURL = item.thumbnailURL {
-                CachedAsyncImage(url: thumbnailURL, thumbnail: true) { image in
+                CachedAsyncImage(url: thumbnailURL, thumbnail: true) { image, _ in
                     image
                         .resizable()
                         .scaledToFill()
